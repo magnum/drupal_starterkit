@@ -7,7 +7,19 @@ projects[drupal][version] = "7.34"
 ; Modules
 projects[backup_migrate][version] = "3.0"
 
+projects[service_links][version] = "2.2"
+
 projects[ctools][version] = "1.6"
+
+projects[ckeditor][version] = "1.16"
+
+projects[context][version] = "3.6"
+
+projects[date][version] = "2.8"
+
+projects[diff][version] = "3.2"
+
+projects[draggableviews][version] = "2.1"
 
 projects[ds][version] = "2.7"
 
@@ -22,6 +34,8 @@ projects[entitycache][version] = "1.2"
 projects[entityreference][version] = "1.1"
 
 projects[fast_404][version] = "1.4"
+
+projects[features][version] = "2.3"
 
 projects[field_collection][version] = "1.0-beta8"
 
@@ -57,13 +71,23 @@ projects[link][version] = "1.3"
 
 projects[metatag][version] = "1.4"
 
+projects[module_filter][version] = "2.0"
+
 projects[references][version] = "2.1"
 
+projects[pathauto][version] = "1.2"
+
 projects[responsive_menus][version] = "1.5"
+
+projects[services][version] = "3.11"
 
 projects[retina_images][version] = "1.0-beta4"
 
 projects[rules][version] = "2.8"
+
+projects[services_views][version] = "1.0"
+
+projects[simplenews][version] = "1.1"
 
 projects[superfish][version] = "1.9"
 
@@ -71,9 +95,13 @@ projects[title][version] = "1.0-alpha7"
 
 projects[token][version] = "1.6"
 
+projects[token_insert][version] = "2.4"
+
 projects[variable][version] = "2.5"
 
 projects[views][version] = "3.10"
+
+projects[views_data_export][version] = "3.0-beta8"
 
 projects[views_slideshow][version] = "3.1"
 
