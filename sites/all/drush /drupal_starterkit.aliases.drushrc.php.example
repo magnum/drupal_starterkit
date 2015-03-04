@@ -1,0 +1,32 @@
+<?php
+
+$aliases['local'] = array(
+  'uri' => 'http://localhost/drupal_starterkit',
+  'root' => '/Users/magnum/projects/drupal_starterkit',
+  'db-url' => 'mysqli://root@127.0.0.1/drupal_starterkit',
+  'command-specific' => array(
+    'rsync' => array(
+      'mode' => 'rlptzO'
+    )
+  ),
+);
+
+
+$aliases['stage'] = array(
+  'uri' => 'http://stage.incode.it/drupal_starterkit',
+  'root' => '/var/www/stage/drupal_starterkit',
+  #'db-url' => 'mysqli://username:password@localhost/site',
+  'remote-host' => 'vps1.incode.it',
+  'remote-user' => 'deploy',
+  'command-specific' => array(
+    'rsync' => array(
+      'mode' => 'rlptzO'
+    )
+  ),
+  'path-aliases' => array(
+    # '%drush' => 'bin/drush',
+    # '%drush-script' => 'bin/drush/drush.php',
+    '%files' => 'sites/default/files',
+    # '%custom' => 'domains/dev.mysite.com'
+  ),
+);
