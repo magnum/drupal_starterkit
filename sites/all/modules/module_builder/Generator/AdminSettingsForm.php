@@ -17,6 +17,13 @@ namespace ModuleBuider\Generator;
 class AdminSettingsForm extends Form {
 
   /**
+   * @inheritdoc
+   */
+  public static function requestedComponentHandling() {
+    return 'singleton';
+  }
+
+  /**
    * Return an array of subcomponent types.
    */
   protected function requiredComponents() {
@@ -30,6 +37,13 @@ class AdminSettingsForm extends Form {
       'page callback' => 'drupal_get_form',
       'page arguments' => "array('{$form_name}')",
       'access arguments' => "array('administer %module')",
+    );
+
+    $components['Permissions'] = array(
+      'component_type' => 'Permissions',
+      'request_data' => array(
+        'administer %module',
+      ),
     );
 
     return $components;
@@ -61,7 +75,9 @@ class AdminSettingsForm extends Form {
    * The name of the form.
    */
   protected function getFormName() {
-    $base_component_name = $this->base_component->getComponentSystemName();
+    // TODO: this should be set in our data.
+    $root_component_data = $this->getRootComponentData();
+    $base_component_name = $root_component_data['root_name'];
     return "{$base_component_name}_settings_form";
   }
 

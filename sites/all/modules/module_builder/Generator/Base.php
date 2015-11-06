@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains general generator classes, abstract parents, etc.
+ * Contains ModuleBuider\Generator\BaseGenerator.
  */
 
 namespace ModuleBuider\Generator;
@@ -17,16 +17,18 @@ namespace ModuleBuider\Generator;
  *  - a list of file info is built up, with each generator allowed to contribute
  *  - the file info is processed and returned for the caller to output
  *
- * The generator system works by starting with a particular generator for a
+ * @section sec_gather_generators Gathering generators
+ * The generator system starts with a particular generator for a
  * given component (e.g., 'module'), and then adding generators this one
  * requests, recursing this process into each new generator and building a tree
- * down from the original one. This is achieved by each generator class
- * implementing requiredComponents() to return its child components. The process ends
+ * down from the original one. This is done by assembleComponentList(), which is
+ * recursively called on each generator class. Each class implements
+ * requiredComponents() to return a list of child components. The process ends
  * when the added generators are themselves one that return no sub-components.
  *
- * So for example, the caller requests a 'module' component. This causes
- * the entry point to the system, Generate::generateComponent() to
- * instantiate a module generator, which is then interrogated for its
+ * So for example, the caller requests a 'module' component. This causes the
+ * entry point to the system, ModuleBuider\Task\Generate::generateComponent(),
+ * to instantiate a module generator, which is then interrogated for its
  * subcomponents. It returns, say, that it needs:
  *  - a README file
  *  - a .info file
@@ -41,20 +43,27 @@ namespace ModuleBuider\Generator;
  * The end result is a flat list of components, keyed by component names. Each
  * component has the data it needs to operate.
  *
- * Once we have this, we iterate over it to assemble a tree structure, which
- * tells us which components contains which other components. For example, the
- * module code file contains functions and hook implementations.
+ * @section sec_assemble_tree Assemble component tree
+ * The list of components is iterated over in assembleComponentTree() to
+ * assemble a tree structure of the components, where child components are those
+ * that are contained by their parents. For example, the module code file
+ * contains functions and hook implementations.
  *
- * Once we have this, we then recurse once more into it, this time building up
+ * This tree is iterated over again in assembleContainedComponents() to allow
+ * the parent components in the tree to gather data from their child components.
+ *
+ * @section sec_assemble_file_info Collect file info
+ * We then recurse down the tree in collectFiles(), building up
  * an array of file info that we pass by reference (this it can be altered
  * as well as added to, though generator order is TBFO). Generator classes that
  * wish to add files should override collectFiles() to add them.
  *
+ * @section sec_assemble_files Assemble files
  * Finally, we assemble the file info into filenames and code, ready for the
  * initiator of the whole process (e.g., Drush, Drupal UI) to output them in an
  * appropriate way. This is done in the starting generator's assembleFiles().
  *
- * There are three distinc hierarchies at work here:
+ * There are three distinct hierarchies at work here:
  *  - A plain PHP class hierarchy, which is just there to allow us to make use
  *    of method inheritance. So for instance, ModuleCodeFile inherits from File.
  *    This is just for code re-use.
@@ -192,10 +201,10 @@ abstract class BaseGenerator {
   }
 
   /**
-   * Get the list of required components this generator.
+   * Get the list of required components for this generator.
    *
-   * This calls itself recursively on the returned components, so that any added
-   * component may in turn add more.
+   * This iterates down the tree of component requests, so that any added
+   * component may in turn request some of its own.
    *
    * Generator classes should implement requiredComponents() to return the list
    * of component types they require, possibly depending on incoming data.
@@ -211,39 +220,70 @@ abstract class BaseGenerator {
     // Get the base component to add the generators to it.
     $base_component = $this->task->getRootGenerator();
 
-    // Get the required subcomponents.
-    $subcomponent_info = $this->requiredComponents();
+    // The complete list we'll assemble.
+    $component_list = array();
 
-    // Instantiate each one (if not already done), and recurse into it.
-    foreach ($subcomponent_info as $component_name => $data) {
-      // The $data may either be a string giving a class name, or an array.
-      if (is_string($data)) {
-        $component_type = $data;
-        $component_data = array();
-      }
-      else {
-        $component_type = $data['component_type'];
-        $component_data = $data;
-      }
+    // Prep the current level with the root component for the first iteration.
+    $current_level = array(
+      $this->name => $this
+    );
 
-      $generator = $this->task->getGenerator($component_type, $component_name, $component_data);
+    // Do a breadth-first tree traversal, working over the current level to
+    // create the next level, until there are no further items.
+    do {
+      $next_level = array();
 
-      // If the component is already present, merge any additionally requested
-      // data with the existing component and then continue to the next one.
-      if (isset($base_component->components[$component_name])) {
-        if (!empty($component_data)) {
-          $base_component->components[$component_name]->mergeComponentData($component_data);
-        }
+      // Work over the current level, assembling a temporary array for the next
+      // level.
+      foreach ($current_level as $current_level_component_name => $item) {
+        // Each item of the current level gives us some children.
+        $item_subcomponent_info = $item->requiredComponents();
 
-        continue;
-      }
+        // Instantiate each one (if not already done), and add it to the next
+        // level.
+        foreach ($item_subcomponent_info as $component_name => $data) {
+          // The $data may either be a string giving a class name, or an array.
+          if (is_string($data)) {
+            $component_type = $data;
+            $component_data = array();
 
-      // Add the new component to the master array of components on the base.
-      $base_component->components[$component_name] = $generator;
+            // Set the type in the array for consistency in debugging.
+            $component_data['component_type'] = $component_type;
+          }
+          else {
+            $component_type = $data['component_type'];
+            $component_data = $data;
+          }
 
-      // Recurse into the subcomponent.
-      $generator->assembleComponentList();
-    }
+          // A requested subcomponent may already exist in our tree, in which
+          // case we merge the received data in with the existing component.
+          if (isset($component_list[$component_name])) {
+            $component_list[$component_name]->mergeComponentData($component_data);
+
+            // Skip this as it's already been instantiated.
+            continue;
+          }
+
+          // Instantiate the generator.
+          $generator = $this->task->getGenerator($component_type, $component_name, $component_data);
+
+          // Add the new component to the complete array of components.
+          $component_list[$component_name] = $generator;
+
+          // Add the new component to the next level.
+          $next_level[$component_name] = $generator;
+        } // each requested subcomponent from a component in the current level.
+      } // each component in the current level
+
+      // Now have all the next level.
+
+      // Set the next level to be current for the next loop.
+      $current_level = $next_level;
+    } while (!empty($next_level));
+
+    // Add the collected components to the master array of components on the
+    // base generator.
+    $base_component->components = $component_list;
   }
 
   /**
@@ -278,6 +318,25 @@ abstract class BaseGenerator {
    */
   protected function mergeComponentData($additional_component_data) {
     $this->component_data = array_merge_recursive($this->component_data, $additional_component_data);
+  }
+
+  /**
+   * Defines how this component should be handled when requested directly.
+   *
+   * @return
+   *  A string which defines how this component should be instantiated when
+   *  it's requested in incoming component data. One of:
+   *  - 'singleton': The component may exist only once, and should be created
+   *    with its name set to the component type.
+   *  - 'repeat': The component may exist in multiple copies, and one should be
+   *    created for each value in the component data.
+   *  - 'group': The component should be instantiated once, with all the values
+   *    set in its data.
+   *
+   * @see RootComponent::processComponentData()
+   */
+  public static function requestedComponentHandling() {
+    return 'repeat';
   }
 
   /**

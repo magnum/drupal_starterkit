@@ -15,13 +15,21 @@ arguments and what order different hooks use. Score one for laziness! ;)
 What Module Builder can create
 ------------------------------
 
-- modules, containing:
-  - hook implementations
-  - test class
-  - api.php file
-  - README file
-- custom themes, containing:
-  - theme template overrides
+Module builder can generate the following for a module:
+- code files, containing hook implementations
+- info file (.info.yml on Drupal 8)
+- README file
+- test case classes
+- plugin classes
+
+Furthermore, complex subcomponents can generate multiple code elements:
+- an admin settings form adds form builder functions and an admin permission
+- router paths add menu/router items
+- permission names add the scaffold for the permission definition (on D7 and,
+  earlier, hook_permission(), on D8 a permissions.yml file)
+
+Module builder can also build themes and install profiles, though these are
+currently still experimental.
 
 How Module Builder can be used
 ------------------------------
@@ -135,12 +143,58 @@ Module builder is primarily a framework for generating code files, that happens
 to be packaged with two UIs that access it: the Drush plugin for use on the
 command line, and the Drupal module for use in the web UI.
 
-This framework has a public API which can be used by other modules.
+This framework has a public API which can be used by other modules. This
+consists of a number of classes in the \ModuleBuilder\Task namespace, which
+provide public methods.
 
-To get started with using the Module Builder API, see:
-  - module_builder_get_factory()
-  - the classes in Environment/Environment.php
-  - the tasks handlers in the Task folder.
+As well as Tasks, Module Builder consists of Environment classes, which deal
+with the differences between running in different environments (e.g., as a
+Drush plugin on Drupal 8 versus as a Drupal module on Drupal 7), and Generator
+classes, which produce the output code.
+
+The basic operation for Module Builder is as in this example:
+
+    // Load the file for the factory class.
+    // (Not necessary if using MB via Composer.)
+    include_once('ModuleBuilderFactory.php');
+    // Tell MB which environment it's being used in. The Drupal core version is
+    // detected automatically.
+    \ModuleBuilder\Factory::setEnvironmentClass('Drush');
+    // Get the Task handler.
+    $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
+    // Call a method in the Task handler to perform the operation.
+    $hook_declarations = $mb_task_handler_report->getHookDeclarations();
+
+The code generation system is made up of a set of Generator classes, and is
+operated from the \ModuleBuilder\Task\Generate class. To build code, you need
+to specify:
+  - the root generator to use, such as 'module', 'theme', 'profile'. This is
+    the name of a subclass of ModuleBuider\Generator\RootComponent.
+  - an array of component data. The options for this depend on the component.
+
+ This is done as follows:
+
+  // Get the generator task.
+  $task = \ModuleBuilder\Factory::getTask('Generate', 'module');
+  // Get the info about the component data. This is an array keyed by property
+  // name, with the definition of each property.
+  $component_data_info = $mb_task_handler_generate->getRootComponentDataInfo();
+  foreach ($component_data_info as $property_name => &$property_info) {
+    // Prepare each property. This sets up the default value and the options.
+    // This is to allow each property to use the data entered so far. For
+    // example, if the user enters 'foo_bar' for the module machine name, the
+    // proposed default for the module readable name will be 'Foo Bar'.
+    $task->prepareComponentDataProperty($property_name, $property_info, $component_data);
+  }
+  // Set your values.
+  $component_data['root_name'] = 'foo_bar';
+  // Perform any final processing on the component data.
+  // This prepares data, for example expands options such as hook presets.
+  $task->processComponentData($component_data_info, $component_data);
+  // Get the files of generated code.
+  // This is an array keyed by filename, where each value is the text of the
+  // file.
+  $files = $task->generateComponent($component_data);
 
 Todo/wishlist
 -------------

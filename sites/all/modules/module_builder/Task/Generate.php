@@ -9,8 +9,6 @@ namespace ModuleBuider\Task;
 
 /**
  * Task handler for generating a component.
- *
- * (Replaces generate.inc.)
  */
 class Generate extends Base {
 
@@ -62,7 +60,7 @@ class Generate extends Base {
    * @return
    *  A sanity level string to pass to the environment's verifyEnvironment().
    */
-  function getSanityLevel() {
+  public function getSanityLevel() {
     return $this->root_generator->sanity_level;
   }
 
@@ -87,11 +85,84 @@ class Generate extends Base {
   }
 
   /**
+   * Get a list of the properties that the root component should be given.
+   *
+   * UIs may use this to present the options to the user. Each property should
+   * be passed to prepareComponentDataProperty(), to set any option lists and
+   * allow defaults to build up incrementally.
+   *
+   * After all data has been gathered from the user, the completed data array
+   * should be passed to processComponentData().
+   *
+   * Finally, the array should be passed to generateComponent() to generate the
+   * code.
+   *
+   * @return
+   *  An array containing information about the properties our root component
+   *  needs in the $component_data array to pass to generateComponent(). Keys
+   *  are the names of properties. Each value is an array of information for the
+   *  property. Of interest to UIs calling this are:
+   *  - 'label': A human-readable label for the property.
+   *  - 'format': Specifies the expected format for the property. One of
+   *    'string' or 'array'.
+   *  - 'required': Boolean indicating whether this property must be provided.
+   * For the full documentation for all properties, see
+   * ModuleBuider\Generator\RootComponent\componentDataDefinition().
+   */
+  public function getRootComponentDataInfo() {
+    return $this->root_generator->getComponentDataInfo();
+  }
+
+  /**
+   * Prepares a property in the component data with default value and options.
+   *
+   * This should be called for each property in the component data info that is
+   * obtained from getRootComponentDataInfo(), in the order given in that array.
+   * This allows UIs to present default values to the user in a progressive
+   * manner. For example, the Drush interactive mode may present a default value
+   * for the module human name based on the value the user has already entered
+   * for the machine name.
+   *
+   * The default value is placed into $component_data[$property_name]; the
+   * options if any are placed into $property_info['options'].
+   *
+   * @param $property_name
+   *  The name of the property.
+   * @param &$property_info
+   *  The definition for this property, from getRootComponentDataInfo().
+   *  If the property has options, this will get its 'options' key set, as an
+   *  array of the format VALUE => LABEL.
+   * @param &$component_data
+   *  An array of component data that is being assembled to eventually pass to
+   *  generateComponent(). This should contain property data that has been
+   *  obtained from the user so far, as a property may depend on input for
+   *  earlier properties. This will get its $property_name key set with the
+   *  default value for the property, which may be calculated based on the
+   *  existing user data.
+   */
+  public function prepareComponentDataProperty($property_name, &$property_info, &$component_data) {
+    $this->root_generator->prepareComponentDataProperty($property_name, $property_info, $component_data);
+  }
+
+  /**
+   * Process component data prior to passing it to generateComponent().
+   *
+   * Performs final processing for the component data:
+   *  - sets default values on empty properties
+   *  - performs additional processing that a property may require
+   *  - expand properties that represent child components.
+   *
+   * @param $component_data_info
+   *  The complete component data info.
+   * @param &$component_data
+   *  The component data array.
+   */
+  public function processComponentData($component_data_info, &$component_data) {
+    $this->root_generator->processComponentData($component_data_info, $component_data);
+  }
+
+  /**
    * Generate the files for a component.
-   *
-   * This is the entry point for the generating system.
-   *
-   * (Replaces module_builder_generate_component().)
    *
    * @param $component_data
    *  An associative array of data for the component. Values depend on the
@@ -168,7 +239,7 @@ class Generate extends Base {
    *   A generator object, with the component name and data set on it, as well
    *   as a reference to this task handler.
    *
-   * @throws \ModuleBuilderException
+   * @throws \ModuleBuilder\Exception
    *   Throws an exception if the given component type does not correspond to
    *   a component class.
    */
@@ -176,7 +247,7 @@ class Generate extends Base {
     $class = $this->getGeneratorClass($component_type);
 
     if (!class_exists($class)) {
-      throw new \ModuleBuilderException("Invalid component type $component_type.");
+      throw new \ModuleBuilder\Exception("Invalid component type $component_type.");
     }
 
     $generator = new $class($component_name, $component_data);
@@ -207,7 +278,7 @@ class Generate extends Base {
     include_once($file_path);
 
     $type     = ucfirst($type);
-    $version  = $this->environment->major_version;
+    $version  = $this->environment->getCoreMajorVersion();
     $class    = 'ModuleBuider\\Generator\\' . $type . $version;
 
     // Trigger the autoload for the base name without the version, as all versions

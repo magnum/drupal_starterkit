@@ -29,7 +29,7 @@ class API extends PHPFile {
    */
   function collectFiles(&$files) {
     $component_data = $this->getRootComponentData();
-    $module_root_name = $component_data['module_root_name'];
+    $module_root_name = $component_data['root_name'];
 
     $this->filename = "$module_root_name.api.php";
 
@@ -47,7 +47,7 @@ class API extends PHPFile {
    */
   function file_doc_summary() {
     $component_data = $this->getRootComponentData();
-    $module_readable_name = $component_data['module_readable_name'];
+    $module_readable_name = $component_data['readable_name'];
     return "Hooks provided by the $module_readable_name module.";
   }
 
@@ -57,15 +57,14 @@ class API extends PHPFile {
   function code_body() {
     $component_data = $this->getRootComponentData();
 
-    $mb_factory = module_builder_get_factory();
     // Sanity checks already done at this point; no need to catch exception.
-    $mb_task_handler_analyze = $mb_factory->getTask('AnalyzeModule');
+    $mb_task_handler_analyze = \ModuleBuilder\Factory::getTask('AnalyzeModule');
 
-    $hooks = $mb_task_handler_analyze->getInventedHooks($component_data['module_root_name']);
+    $hooks = $mb_task_handler_analyze->getInventedHooks($component_data['root_name']);
 
-    $module_root_name = $component_data['module_root_name'];
-    $module_root_name_title_case = ucfirst($component_data['module_root_name']);
-    $module_readable_name = $component_data['module_readable_name'];
+    $module_root_name = $component_data['root_name'];
+    $module_root_name_title_case = ucfirst($component_data['root_name']);
+    $module_readable_name = $component_data['readable_name'];
 
     // Build an array of code pieces.
     $code_pieces = array();

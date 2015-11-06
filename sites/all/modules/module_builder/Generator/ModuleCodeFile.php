@@ -53,7 +53,7 @@ class ModuleCodeFile extends PHPFile {
   function collectFiles(&$files) {
     // Our component name is our future filename, with the token '%module' to
     // be replaced.
-    $this->filename = str_replace('%module', $this->base_component->component_data['module_root_name'], $this->name);
+    $this->filename = str_replace('%module', $this->base_component->component_data['root_name'], $this->name);
 
     $files[$this->name] = array(
       'path' => '', // Means base folder.
@@ -157,7 +157,7 @@ EOT;
       $hook_code .= $this->hook_doxygen($hook['name']);
 
       // function declaration: put in the module name, add closing brace, decode html entities
-      $declaration = preg_replace('/(?<=function )hook/', $module_data['module_root_name'], $hook['definition']);
+      $declaration = preg_replace('/(?<=function )hook/', $module_data['root_name'], $hook['definition']);
       $declaration .= ' {';
       // WTF is this for??????
       $hook_code .= htmlspecialchars_decode($declaration);
@@ -165,7 +165,7 @@ EOT;
       // See if function bodies exist; if so, use function bodies from template
       if (isset($hook['template'])) {
         // Strip out INFO: comments for advanced users
-        if (!module_builder_get_factory()->environment->getSetting('module_builder_detail', 0)) {
+        if (!\ModuleBuilder\Factory::getEnvironment()->getSetting('module_builder_detail', 0)) {
           // Used to strip INFO messages out of generated file for advanced users.
           $pattern = '#\s+/\* INFO:(.*?)\*/#ms';
           $hook['template'] = preg_replace($pattern, '', $hook['template']);
@@ -194,7 +194,7 @@ EOT;
    * Return a file footer.
    */
   function code_footer() {
-    $footer = module_builder_get_factory()->environment->getSetting('module_builder_footer', '');
+    $footer = \ModuleBuilder\Factory::getEnvironment()->getSetting('module_builder_footer', '');
     return $footer;
   }
 
@@ -232,11 +232,11 @@ EOT;
     $module_data = $this->base_component->component_data;
 
     return array(
-      '%module'       => $module_data['module_root_name'],
-      '%description'  => str_replace("'", "\'", $module_data['module_short_description']),
-      '%name'         => !empty($module_data['module_readable_name']) ? str_replace("'", "\'", $module_data['module_readable_name']) : $module_data['module_root_name'],
+      '%module'       => $module_data['root_name'],
+      '%description'  => str_replace("'", "\'", $module_data['short_description']),
+      '%name'         => !empty($module_data['readable_name']) ? str_replace("'", "\'", $module_data['readable_name']) : $module_data['root_name'],
       '%help'         => !empty($module_data['module_help_text']) ? str_replace('"', '\"', $module_data['module_help_text']) : t('TODO: Create admin help text.'),
-      '%readable'     => str_replace("'", "\'", $module_data['module_readable_name']),
+      '%readable'     => str_replace("'", "\'", $module_data['readable_name']),
     );
   }
 

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains the base Task class.
+ * Contains ModuleBuider\Task.
  */
 
 namespace ModuleBuider\Task;
@@ -14,6 +14,9 @@ namespace ModuleBuider\Task;
  * getting hook data by finding and processing api.php files is the domain of
  * the Collect task.
  *
+ * Public methods on Task classes are part of Module Builder's public API, and
+ * may be considered stable.
+ *
  * Each task may also define the sanity level it requires. This allows the
  * Environment object to state whether the current environment is ready for the
  * task. For example, generating a module requires hook data to be ready;
@@ -23,7 +26,7 @@ namespace ModuleBuider\Task;
  * appending the version number to the class name. The unversioned class should
  * also exist as a parent class.
  *
- * Task objects are instantiated by ModuleBuilderFactory::getTask().
+ * Task objects should be instantiated by \ModuleBuilder\Factory::getTask().
  */
 class Base {
 
@@ -42,6 +45,8 @@ class Base {
    *
    * @return
    *  A sanity level string to pass to the environment's verifyEnvironment().
+   *
+   * @see \ModuleBuilder\Environment\EnvironmentInterface::verifyEnvironment()
    */
   function getSanityLevel() {
     return $this->sanity_level;

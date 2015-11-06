@@ -8,10 +8,13 @@
 namespace ModuleBuider\Task;
 
 /**
- * Task handler for collecting and processing hook definitions.
+ * Task handler for collecting and processing definitions for Drupal components.
  *
  * This will do different things depending on the core Drupal version:
- * On D5/6, this donwloads!
+ *  - on D5/6, this downloads documentation files from drupal.org containing
+ *    definitions of hooks.
+ *  - on D7, this collects hook documentation files from the current site.
+ *  - on D8, this collects data about plugins as well as hooks.
  */
 class Collect extends Base {
 
@@ -226,7 +229,7 @@ class Collect extends Base {
     //print_r($hook_groups);
 
     // Write the processed data to a file.
-    $directory = $this->environment->hooks_directory;
+    $directory = $this->environment->getHooksDirectory();
     $serialized = serialize($hook_groups);
     file_put_contents("$directory/hooks_processed.php", $serialized);
 

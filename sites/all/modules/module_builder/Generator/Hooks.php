@@ -15,7 +15,8 @@ namespace ModuleBuider\Generator;
  * group of files, or section of a file.
  *
  * A module component requests a hook component, and this component in turn
- * requests one or more ModuleCodeFile components.
+ * requests one or more HookImplementation components. Those will then in turn
+ * request ModuleCodeFile components for the file they should reside in.
  *
  * TODO: make this work for theme hooks too?
  *
@@ -128,9 +129,8 @@ class Hooks extends BaseGenerator {
    *    'hook_foo' => array('declaration' => DATA, 'template' => DATA)
    */
   function getTemplates($module_data) {
-    $mb_factory = module_builder_get_factory();
     // Sanity checks already done at this point; no need to catch exception.
-    $mb_task_handler_report = $mb_factory->getTask('ReportHookData');
+    $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
 
     // Build a clean list of the requested hooks, by filtering out the keys
     // with 0 values that come from UI form.
@@ -238,8 +238,8 @@ class Hooks extends BaseGenerator {
     // node.hooks.template will only override that same file in the module data;
     // if the hook is not requested as part of a group then that file will not be considered.
     // (Though groups are broken for now...)
-    $version = $mb_factory->environment->major_version;
-    $template_base_path_module = $mb_factory->environment->getPath('templates') . '/' . $version;
+    $version = \ModuleBuilder\Factory::getEnvironment()->getCoreMajorVersion();
+    $template_base_path_module = \ModuleBuilder\Factory::getEnvironment()->getPath('templates') . '/' . $version;
     //print "base path: $template_base_path_module";
     // $template_base_paths['module']
     // $template_base_paths['user']

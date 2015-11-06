@@ -56,9 +56,9 @@ class Module extends RootComponent {
    *   (optional) An array of data for the module. The properties are as
    *   follows:
    *    - 'base': The type of component: 'module'.
-   *    - 'module_root_name': The machine name for the module.
-   *    - 'module_readable_name': The human readable name for the module.
-   *    - 'module_short_description': The module's description text.
+   *    - 'root_name': The machine name for the module.
+   *    - 'readable_name': The human readable name for the module.
+   *    - 'short_description': The module's description text.
    *    - 'module_help_text': Help text for the module. If this is given, then
    *       hook_help() is automatically added to the list of required hooks.
    *    - 'hooks': An associative array whose keys are full hook names
@@ -101,19 +101,19 @@ class Module extends RootComponent {
    */
   protected function componentDataDefinition() {
     $component_data_definition = array(
-      'module_root_name' => array(
+      'root_name' => array(
         'label' => 'Module machine name',
         'default' => 'my_module',
         'required' => TRUE,
       ),
-      'module_readable_name' => array(
+      'readable_name' => array(
         'label' => 'Module readable name',
         'default' => function($component_data) {
-          return ucwords(str_replace('_', ' ', $component_data['module_root_name']));
+          return ucwords(str_replace('_', ' ', $component_data['root_name']));
         },
         'required' => FALSE,
       ),
-      'module_short_description' => array(
+      'short_description' => array(
         'label' => 'Module .info file description',
         'default' => 'TODO: Description of module',
         'required' => FALSE,
@@ -135,14 +135,26 @@ class Module extends RootComponent {
         'default' => NULL,
         'required' => FALSE,
       ),
+      // This adds permissions, so needs to be before permissions.
+      'settings_form' => array(
+        'label' => "Admin settings form",
+        'required' => FALSE,
+        'format' => 'boolean',
+        'component' => 'AdminSettingsForm',
+      ),
+      'permissions' => array(
+        'label' => "Permissions",
+        'required' => FALSE,
+        'format' => 'array',
+        'component' => 'Permissions',
+      ),
       'module_hook_presets' => array(
         'label' => 'Hook preset groups',
         'required' => FALSE,
         'format' => 'array',
         'options' => function(&$property_info) {
           /// ARGH how to make format that is good for both UI and drush?
-          $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrush');
-          $mb_task_handler_report_presets = $mb_factory->getTask('ReportHookPresets');
+          $mb_task_handler_report_presets = \ModuleBuilder\Factory::getTask('ReportHookPresets');
           $hook_presets = $mb_task_handler_report_presets->getHookPresets();
 
           // Stash the hook presets in the property info so the processing
@@ -163,11 +175,11 @@ class Module extends RootComponent {
 
           foreach ($value as $given_preset_name) {
             if (!isset($hook_presets[$given_preset_name])) {
-              throw new \ModuleBuilderException("Undefined hook preset group $given_preset_name.");
+              throw new \ModuleBuilder\Exception("Undefined hook preset group $given_preset_name.");
             }
             // DX: check the preset is properly defined.
             if (!is_array($hook_presets[$given_preset_name]['hooks'])) {
-              throw new \ModuleBuilderException("Incorrectly defined hook preset group $given_preset_name.");
+              throw new \ModuleBuilder\Exception("Incorrectly defined hook preset group $given_preset_name.");
             }
 
             // Add the preset hooks list to the hooks array in the component
@@ -183,16 +195,14 @@ class Module extends RootComponent {
         'required' => FALSE,
         'format' => 'array',
         'options' => function(&$property_info) {
-          $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrush');
-          $mb_task_handler_report_hooks = $mb_factory->getTask('ReportHookData');
+          $mb_task_handler_report_hooks = \ModuleBuilder\Factory::getTask('ReportHookData');
 
           $hook_options = $mb_task_handler_report_hooks->listHookNamesOptions();
 
           return $hook_options;
         },
         'processing' => function($value, &$component_data, &$property_info) {
-          $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrush');
-          $mb_task_handler_report_hooks = $mb_factory->getTask('ReportHookData');
+          $mb_task_handler_report_hooks = \ModuleBuilder\Factory::getTask('ReportHookData');
           // Get the flat list of hooks, standardized to lower case.
           $hook_definitions = array_change_key_case($mb_task_handler_report_hooks->getHookDeclarations());
 
@@ -221,8 +231,7 @@ class Module extends RootComponent {
         'required' => FALSE,
         'format' => 'array',
         'options' => function(&$property_info) {
-          $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrush');
-          $mb_task_handler_report_plugins = $mb_factory->getTask('ReportPluginData');
+          $mb_task_handler_report_plugins = \ModuleBuilder\Factory::getTask('ReportPluginData');
 
           $options = $mb_task_handler_report_plugins->listPluginNamesOptions();
 
@@ -232,12 +241,6 @@ class Module extends RootComponent {
         // components, and the input data should be placed in a nested array in
         // the module data.
         'component' => 'Plugin',
-      ),
-      'settings_form' => array(
-        'label' => "Admin settings form",
-        'required' => FALSE,
-        'format' => 'boolean',
-        'component' => 'AdminSettingsForm',
       ),
       'router_items' => array(
         'label' => "required router paths, eg 'path/foo'",
@@ -259,7 +262,7 @@ class Module extends RootComponent {
         // is computed from other properties.
         'computed' => TRUE,
         'default' => function($component_data) {
-          $pieces = explode('_', $component_data['module_root_name']);
+          $pieces = explode('_', $component_data['root_name']);
           $pieces = array_map('ucfirst', $pieces);
           return implode('', $pieces);
         },
@@ -267,13 +270,6 @@ class Module extends RootComponent {
     );
 
     return $component_data_definition;
-  }
-
-  /**
-   * Get the Drupal name for this component, e.g. the module's name.
-   */
-  public function getComponentSystemName() {
-    return $this->component_data['module_root_name'];
   }
 
   /**

@@ -2,84 +2,91 @@
 
 /**
  * @file
- * Contains the ModuleBuilderFactory class and other support classes.
- *
- * This file should/could be somewhere else for autoloading, but the core issue
- * regarding PSR-4/X is still ongoing (https://drupal.org/node/1971198) and I'd
- * rather move files and rename classes once rather than twice.
+ * Contains ModuleBuilder\Factory.
  */
 
-/**
- * Helper to get a Module Builder factory.
- *
- * (Which makes it a factory factory? Ouch my head...)
- *
- * This is the entry point to Module Builder.
- *
- * @param $environment_class
- *  The name of the environment class to set on the factory. No checks are run
- *  on the environment at this stage (and therefore the environment handler may
- *  be flagged to skip checks via the returned factory). This parameter may be
- *  ommitted if the the caller is certain that the factory has previously been
- *  created and it is just calling this to retrieve it.
- *
- * @return
- *  A new ModuleBuilderFactory object if called for the first time, or the same
- *  factory object as last time on subsequent calls. The environment is
- *  available in the 'environment' property of the factory.
- */
-function module_builder_get_factory($environment_class = NULL) {
-  static $factory;
-
-  if (!isset($factory)) {
-    // Include the environment classes file.
-    include_once(dirname(__FILE__) . '/Environment/Environment.php');
-
-    // Create the environment handler and set it on the factory.
-    // You did pass in the environment class, didn't you?
-    $environment = new $environment_class;
-
-    $factory = new ModuleBuilderFactory($environment);
-  }
-
-  return $factory;
-}
+namespace ModuleBuilder;
 
 /**
- * Factory class for creating Module Builder task handlers.
+ * Static factory class for creating Module Builder task handlers.
  *
  * A Task Handler is an object which provides a public API which can be used by
  * different UIs for performing various module builder tasks.
  *
  * The process for using this factory is:
- *  - Get the factory from module_builder_get_factory(), passing the name of the
- *    environment class that represents where you are using Module Builder.
+ *  - Set the environment that represents where you are using Module Builder.
  *  - Get the task handler. This checks the environment to see whether it is
  *    suitably set up for the requested task (eg, whether the hooks directory
  *    exists, whether hook data has been compiled). This throws an exception if
  *    the environment is not in a state the task requires.
  *  - Execute the required method on the task handler.
+ *
+ * @code
+ *  include_once('path/to/ModuleBuilderFactory.php');
+ *  \ModuleBuilder\Factory::setEnvironmentClass('Drush');
+ *  $task = \ModuleBuilder\Factory::getTask('ReportHookData');
+ * @endcode
  */
-class ModuleBuilderFactory {
+class Factory {
 
   /**
    * The current environment object; subclass of ModuleBuilderEnvironmentBase.
    *
-   * Set by the constructor. May be freely accessed.
+   * @see setEnvironmentClass()
+   * @see getEnvironment()
    */
-  public $environment;
+  protected static $environment;
 
   /**
-   * Constructor.
+   * Set the environment using a class name.
    *
-   * We set the environment on the factory now, so that getTask() can make use
-   * of it later.
+   * This is a convenience wrapper around setEnvironment() for when using an
+   * environment class native to Module Builder.
    *
-   * @param ModuleBuilderEnvironment $environment
-   *  A new environment object.
+   * @param $environment_class
+   *  The name of the environment class to set on the factory, relative to the
+   *  \ModuleBuilder\Environment namespace (to use a class outside of that
+   *  namespace, use setEnvironment()). No checks are run on the environment
+   *  at this stage (and therefore the environment handler may be flagged to
+   *  skip checks via the returned factory).
+   *
+   * @return
+   *  The environment object.
    */
-  function __construct($environment) {
-    $this->environment = $environment;
+  public static function setEnvironmentClass($environment_class) {
+    // Include the environment interface and classes files.
+    include_once(__DIR__ . '/Environment/EnvironmentInterface.php');
+    include_once(__DIR__ . '/Environment/Environment.php');
+
+    // Create the environment handler and set it on the factory.
+    $environment_class = '\ModuleBuilder\Environment\\' . $environment_class;
+
+    self::setEnvironment(new $environment_class);
+
+    return self::$environment;
+  }
+
+  /**
+   * Set the environment object.
+   *
+   * @param \ModuleBuilder\Environment\EnvironmentInterface $environment
+   *  An environment object to set.
+   */
+  public static function setEnvironment(\ModuleBuilder\Environment\EnvironmentInterface $environment) {
+    self::$environment = new $environment;
+  }
+
+  /**
+   * Get the environment object.
+   *
+   * @return
+   *  The environment object.
+   */
+  public static function getEnvironment() {
+    if (!isset(self::$environment)) {
+      throw new Exception("Environment not set.");
+    }
+    return self::$environment;
   }
 
   /**
@@ -91,7 +98,8 @@ class ModuleBuilderFactory {
    *
    * @param $task_type
    *  The type of task. This should the the name of a class in the
-   *  ModuleBuider\Task namespace. May be one of:
+   *  ModuleBuider\Task namespace, without the Drupal core version suffix.
+   *  May be one of:
    *    - 'Collect': Collect and process data on available hooks.
    *    - 'ReportHookData':
    *    - ... others TODO.
@@ -102,22 +110,26 @@ class ModuleBuilderFactory {
    * @return
    *  A new task handler object, which implements ModuleBuilderTaskInterface.
    *
-   * @throws ModuleBuilderException
+   * @throws \ModuleBuilder\Exception
    *  Throws an exception if the environment is not in a state that is ready for
    *  the requested task, for example, if no hook data has been downloaded.
    */
-  function getTask($task_type, $task_options = NULL) {
-    $task_class = $this->getTaskClass($task_type);
+  public static function getTask($task_type, $task_options = NULL) {
+    if (!isset(self::$environment)) {
+      throw new Exception("Environment not set.");
+    }
+
+    $task_class = self::getTaskClass($task_type);
 
     // Set the environment handler on the task handler too.
-    $task_handler = new $task_class($this->environment, $task_options);
+    $task_handler = new $task_class(self::$environment, $task_options);
 
     // Find out what sanity level the task handler needs.
     $required_sanity = $task_handler->getSanityLevel();
     //dsm($required_sanity);
 
     // Check the environment for the required sanity level.
-    $this->environment->verifyEnvironment($required_sanity);
+    self::$environment->verifyEnvironment($required_sanity);
 
     return $task_handler;
   }
@@ -125,16 +137,20 @@ class ModuleBuilderFactory {
   /**
    * Helper function to get the desired Task class.
    *
+   * Takes care of including files for base class and non-version-specific
+   * class as well as the class itself.
+   *
    * @param $task_type
-   *  The type of the task. This is used to determine the class.
+   *  The type of the task. This is the class name without the Drupal core
+   *  version suffix.
    *
    * @return
    *  A fully qualified class name for the type and, if it exists, version, e.g.
    *  'ModuleBuider\Task\Collect7'.
    */
-  public function getTaskClass($task_type) {
+  public static function getTaskClass($task_type) {
     $type     = ucfirst($task_type);
-    $version  = $this->environment->major_version;
+    $version  = self::$environment->getCoreMajorVersion();
 
     // TODO: this could do with namespacing and autoloading in due course.
     include_once(dirname(__FILE__) . "/Task/Base.php");
@@ -163,7 +179,7 @@ class ModuleBuilderFactory {
 /**
  * Custom exception class.
  */
-class ModuleBuilderException extends Exception {
+class Exception extends \Exception {
   // Flag set to TRUE if hook data needs downloading (and the folders are ok).
   // This allows us to recover gracefully.
   public $needs_hooks_download;

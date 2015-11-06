@@ -22,7 +22,7 @@ class Info extends File {
   function collectFiles(&$files) {
     $files['info'] = array(
       'path' => '', // Means base folder.
-      'filename' => $this->base_component->component_data['module_root_name'] . '.info',
+      'filename' => $this->base_component->component_data['root_name'] . '.info',
       // We pass $files in to check for files containing classes.
       'body' => $this->file_body($files),
       // We join the info lines with linebreaks, as they (currently!) do not
@@ -86,8 +86,8 @@ class Info5 extends InfoIni {
     $module_data = $this->base_component->component_data;
 
     $lines = array();
-    $lines['name'] = $module_data['module_readable_name'];
-    $lines['description'] = $module_data['module_short_description'];
+    $lines['name'] = $module_data['readable_name'];
+    $lines['description'] = $module_data['short_description'];
 
     if (!empty($module_data['module_dependencies'])) {
       $lines['dependencies'] = $module_data['module_dependencies'];
@@ -115,8 +115,8 @@ class Info6 extends InfoIni {
     $module_data = $this->base_component->component_data;
 
     $lines = array();
-    $lines['name'] = $module_data['module_readable_name'];
-    $lines['description'] = $module_data['module_short_description'];
+    $lines['name'] = $module_data['readable_name'];
+    $lines['description'] = $module_data['short_description'];
     if (!empty($module_data['module_dependencies'])) {
       // For lines which form a set with the same key and array markers,
       // simply make an array.
@@ -152,8 +152,8 @@ class Info7 extends InfoIni {
     //print_r($module_data);
 
     $lines = array();
-    $lines['name'] = $module_data['module_readable_name'];
-    $lines['description'] = $module_data['module_short_description'];
+    $lines['name'] = $module_data['readable_name'];
+    $lines['description'] = $module_data['short_description'];
     if (!empty($module_data['module_dependencies'])) {
       // For lines which form a set with the same key and array markers,
       // simply make an array.
@@ -192,7 +192,7 @@ class Info8 extends Info {
   function collectFiles(&$files) {
     parent::collectFiles($files);
 
-    $files['info']['filename'] = $this->base_component->component_data['module_root_name'] . '.info.yml';
+    $files['info']['filename'] = $this->base_component->component_data['root_name'] . '.info.yml';
   }
 
   /**
@@ -206,9 +206,9 @@ class Info8 extends Info {
     print_r($module_data);
 
     $lines = array();
-    $lines['name'] = $module_data['module_readable_name'];
+    $lines['name'] = $module_data['readable_name'];
     $lines['type'] = $module_data['base'];
-    $lines['description'] = $module_data['module_short_description'];
+    $lines['description'] = $module_data['short_description'];
     if (!empty($module_data['module_dependencies'])) {
       // For lines which form a set with the same key and array markers,
       // simply make an array.

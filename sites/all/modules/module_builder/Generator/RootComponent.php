@@ -16,14 +16,6 @@ namespace ModuleBuider\Generator;
 abstract class RootComponent extends BaseGenerator {
 
   /**
-   * Get the Drupal name for this component, e.g. the module's name.
-   *
-   * @todo: standardize this in the different root generators' component data
-   * so this is not needed.
-   */
-  abstract public function getComponentSystemName();
-
-  /**
    * Define the component data this component needs to function.
    *
    * This returns an array of data that defines the component data that
@@ -40,23 +32,36 @@ abstract class RootComponent extends BaseGenerator {
    * Note this can't be a class property due to use of closures.
    *
    * @return
-   *  An array that defines the data this component needs to operate. Each key
-   *  corresponds to a key for a property in the $component_data that should be
-   *  passed to __construct(). Each value is an array, with the following keys:
+   *  An array that defines the data this component needs to operate. The order
+   *  is important, as callbacks may depend on component data that has been
+   *  assembled so far, i.e., on data properties that are earlier in the array.
+   *  Each key corresponds to a key for a property in the $component_data that
+   *  should be passed to this class's __construct(). Each value is an array,
+   *  with the following keys:
    *  - 'label': A human-readable label for the property.
-   *  - 'format': Specifies the expected format for the property. One of
-   *    'string' or 'array'.
-   *  - 'default': The default value for the property. This is either a static
-   *    value, or a callable, in which case it must be called with the array of
-   *    component data assembled so far. Depending on the value of 'required',
-   *    this represents either the value that may be presented as a default to
-   *    the user in a UI for convenience, or the value that will be be set if
-   *    nothing is provided when instatiating the component.
-   *  - 'required': Boolean indicating whether this property must be provided.
-   *  - 'options': A list of options for the property. This is a callable, which
-   *    must be called with the component data assembled so far.
-   *  - 'processing': A callback to processComponentData() to use to process
-   *    input values into the final format for the component data array.
+   *  - 'format': (optional) Specifies the expected format for the property.
+   *    One of 'string', 'array', or 'boolean'. Defaults to 'string'.
+   *  - 'default': (optional) The default value for the property. This is either
+   *    a static value, or a callable, in which case it must be called with the
+   *    array of component data assembled so far. Depending on the value of
+   *    'required', this represents either the value that may be presented as a
+   *    default to the user in a UI for convenience, or the value that will be
+   *    set if nothing is provided when instatiating the component. Note that
+   *    this is required if a later property makes use of this property in a
+   *    callback, as non-progressive UIs can only rely on hardcoded default
+   *    values.
+   *  - 'required': (optional) Boolean indicating whether this property must be
+   *    provided. Defaults to FALSE.
+   *  - 'options': (optional) A callable which returns a list of options for the
+   *    property. This receives the component data assembled so far.
+   *  - 'processing': (optional) A callback to processComponentData() to use to
+   *    process input values into the final format for the component data array.
+   *  - 'component': (optional) The name of a generator class, relative to the
+   *    namespace. If present, this results in child components of this class
+   *    being added to the component tree. The handling of this is determined
+   *    by the component class's requestedComponentHandling() method.
+   *  - 'computed': (optional) If TRUE, indicates that this property is computed
+   *    by the component, and should not be obtained from the user.
    *
    * @see getComponentDataInfo()
    */
@@ -65,12 +70,8 @@ abstract class RootComponent extends BaseGenerator {
   /**
    * Get a list of the properties that are required in the component data.
    *
-   * UIs may use this to present the options to the user. Each property should
-   * be passed to prepareComponentDataProperty(), to set any option lists and
-   * allow defaults to build up incrementally.
-   *
-   * After all data has been gathered from the user, the completed data array
-   * should be passed to processComponentData().
+   * UIs should use ModuleBuider\Task\Generate\getRootComponentDataInfo() rather
+   * than this method.
    *
    * @param $include_computed
    *  (optional) Boolean indicating whether to include computed properties.
@@ -79,12 +80,7 @@ abstract class RootComponent extends BaseGenerator {
    * @return
    *  An array containing information about the properties this component needs
    *  in its $component_data array. Keys are the names of properties. Each value
-   *  is an array of information for the property. Of interest to UIs calling
-   *  this are:
-   *  - 'label': A human-readable label for the property.
-   *  - 'format': Specifies the expected format for the property. One of
-   *    'string' or 'array'.
-   *  - 'required': Boolean indicating whether this property must be provided.
+   *  is an array of information for the property.
    *
    * @see componentDataDefinition()
    * @see prepareComponentDataProperty()
@@ -227,17 +223,28 @@ abstract class RootComponent extends BaseGenerator {
         // Get the component type.
         $component_type = $property_info['component'];
 
-        switch ($property_info['format']) {
-          case 'array':
+        // Ask the component type class how to handle this.
+        $class = $this->task->getGeneratorClass($component_type);
+        $handling_type = $class::requestedComponentHandling();
+
+        switch ($handling_type) {
+          case 'singleton':
+            // The component type can only occur once and therefore the name is
+            // the same as the type.
+            $component_data['requested_components'][$component_type] = $component_type;
+            break;
+          case 'repeat':
             // Each value in the array is the name of a component.
             foreach ($component_data[$property_name] as $requested_component_name) {
               $component_data['requested_components'][$requested_component_name] = $component_type;
             }
             break;
-          case 'boolean':
-            // The component type can only occur once and therefore the name is
-            // the same as the type.
-            $component_data['requested_components'][$component_type] = $component_type;
+          case 'group':
+            // Request a single component with the list of data.
+            $component_data['requested_components'][$component_type] = array(
+              'request_data' => $component_data[$property_name],
+              'component_type' => $component_type,
+            );
             break;
         }
       }

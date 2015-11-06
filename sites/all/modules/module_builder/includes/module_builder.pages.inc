@@ -58,16 +58,15 @@ function module_builder_page($form, &$form_state) {
  * Form builder for page 1.
  */
 function module_builder_page_input($form, &$form_state) {
-  // Get a MB factory.
-  $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
 
   // Get our task handler, which checks hook data is ready, and our generate
   // handler, from which to get the list of properties to collect.
   try {
-    $mb_task_handler_report = $mb_factory->getTask('ReportHookData');
-    $mb_task_handler_generate = $mb_factory->getTask('Generate', 'module');
+    $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
+    $mb_task_handler_generate = \ModuleBuilder\Factory::getTask('Generate', 'module');
   }
-  catch (ModuleBuilderException $e) {
+  catch (\ModuleBuilder\Exception $e) {
     if ($e->needs_hooks_download) {
       drupal_set_message(t('No hooks were found. Please check the documentation path specified in the <a href="!settings-url">%administer >> %config >> %develop >> %modulebuilder</a> page.',
         array(
@@ -82,10 +81,8 @@ function module_builder_page_input($form, &$form_state) {
     }
   }
 
-  $root_generator = $mb_task_handler_generate->getRootGenerator();
-
   // Get the component data info.
-  $component_data_info = $root_generator->getComponentDataInfo();
+  $component_data_info = $mb_task_handler_generate->getRootComponentDataInfo();
 
   $component_data = array();
 
@@ -93,7 +90,7 @@ function module_builder_page_input($form, &$form_state) {
   // Each property info needs to be prepared, so iterate by reference.
   foreach ($component_data_info as $property_name => &$property_info) {
     // Prepare the single property: get options, default value, etc.
-    $root_generator->prepareComponentDataProperty($property_name, $property_info, $component_data);
+    $mb_task_handler_generate->prepareComponentDataProperty($property_name, $property_info, $component_data);
     //dsm($component_data, $property_name);
 
     $element = array(
@@ -128,7 +125,7 @@ function module_builder_page_input($form, &$form_state) {
   }
 
   // Get the hook names for the presets for our Javascript to work with.
-  $mb_task_handler_report_presets = $mb_factory->getTask('ReportHookPresets');
+  $mb_task_handler_report_presets = \ModuleBuilder\Factory::getTask('ReportHookPresets');
   $hook_presets = $mb_task_handler_report_presets->getHookPresets();
   foreach ($hook_presets as $hook_preset_name => $hook_preset_data) {
     // Build a reverse array whose keys are hooks and values are arrays
@@ -193,15 +190,15 @@ function module_builder_page_input($form, &$form_state) {
 
   // Add our own (longer) descriptions and defaults.
   // TODO: consider moving some of these to the Module generator.
-  $form['module_root_name']['#description'] = t('This string is used to name the module files and to prefix all of your functions. This must only contain letters, numbers, and underscores, and may not start with a number.');
-  $form['module_readable_name']['#description'] = t('Name of your module as it will appear on the module admin page.');
-  $form['module_short_description']['#description'] = t('This text will appear in the module admin list at <a href="!adminmodules">%administer >> %modules</a>.',
+  $form['root_name']['#description'] = t('This string is used to name the module files and to prefix all of your functions. This must only contain letters, numbers, and underscores, and may not start with a number.');
+  $form['readable_name']['#description'] = t('Name of your module as it will appear on the module admin page.');
+  $form['short_description']['#description'] = t('This text will appear in the module admin list at <a href="!adminmodules">%administer >> %modules</a>.',
     array(
       '!adminmodules' => url('admin/modules'),
       '%administer' => 'Administer',
       '%modules' => 'Modules',
     ));
-  $form['module_short_description']['#default_value'] = t('Does awesome things. Makes tea. Washes up. Favours of a personal nature.');
+  $form['short_description']['#default_value'] = t('Does awesome things. Makes tea. Washes up. Favours of a personal nature.');
   $form['module_help_text']['#description'] = t('Help text (HTML) to appear within the system help at <a href="!help">%administer >> %help >> module_name</a>',
     array(
       '!help' => url('admin/help'),
@@ -243,7 +240,7 @@ function module_builder_page_input($form, &$form_state) {
   // built some default values.
   // these are either hardcoded or what the user already put into the form on a previous go round.
   $form_default_values = array(
-    'module_root_name' => 'mymodule',
+    'root_name' => 'mymodule',
   );
   if (isset($form_state['storage']['input'])) {
     $form_default_values = array_merge($form_default_values, $form_state['storage']['input']);
@@ -273,15 +270,15 @@ function module_builder_page_input($form, &$form_state) {
   */
 
   // Module properties
-  $form['module_root_name'] = array(
+  $form['root_name'] = array(
     '#type' => 'textfield',
     '#title' => t('Machine-readable name'),
     '#description' => t('This string is used to name the module files and to prefix all of your functions. This must only contain letters, numbers, and underscores, and may not start with a number.'),
     '#required' => TRUE,
-    '#default_value' => t('mymodule'), # $form_default_values['module_root_name'],
+    '#default_value' => t('mymodule'), # $form_default_values['root_name'],
     '#repopulate' => TRUE,
   );
-  $form['module_readable_name'] = array(
+  $form['readable_name'] = array(
     '#type' => 'textfield',
     '#title' => t('Name'),
     '#description' => t('Name of your module as it will appear on the module admin page.'),
@@ -289,7 +286,7 @@ function module_builder_page_input($form, &$form_state) {
     '#default_value' => t('My Module'),
     '#repopulate' => TRUE,
   );
-  $form['module_short_description'] = array(
+  $form['short_description'] = array(
     '#type' => 'textfield',
     '#title' => t('Description'),
     '#description' => t('This text will appear in the module admin list at <a href="!adminmodules">%administer >> %modules</a>.',
@@ -332,9 +329,9 @@ function module_builder_page_input($form, &$form_state) {
 
   // Get the hook presets list.
   try {
-    $mb_task_handler_report_presets = $mb_factory->getTask('ReportHookPresets');
+    $mb_task_handler_report_presets = \ModuleBuilder\Factory::getTask('ReportHookPresets');
   }
-  catch (ModuleBuilderException $e) {
+  catch (\ModuleBuilder\Exception $e) {
     // We've already sanity-checked, so doubtful we come here.
     return $form;
   }
@@ -498,14 +495,13 @@ function module_builder_page_input_submit($form, &$form_state) {
  * Form builder for page 2: generate code.
  */
 function module_builder_page_generate($form, &$form_state) {
-  $mb_factory = module_builder_get_factory('ModuleBuilderEnvironmentDrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
 
   // Get our task handler. The form builder will already have checked sanity.
-  $mb_task_handler_generate = $mb_factory->getTask('Generate', 'module');
+  $mb_task_handler_generate = \ModuleBuilder\Factory::getTask('Generate', 'module');
 
   // Get the component data info.
-  $root_generator = $mb_task_handler_generate->getRootGenerator();
-  $component_data_info = $root_generator->getComponentDataInfo();
+  $component_data_info = $mb_task_handler_generate->getRootComponentDataInfo();
 
   // No need to call prepareComponentDataProperty() here.
 
@@ -517,7 +513,7 @@ function module_builder_page_generate($form, &$form_state) {
 
   // Perform any final processing on the component data.
   // This prepares data, for example expands options such as hook presets.
-  $root_generator->processComponentData($component_data_info, $module_data);
+  $mb_task_handler_generate->processComponentData($component_data_info, $module_data);
 
   // Get the files.
   $files = $mb_task_handler_generate->generateComponent($module_data);
@@ -549,7 +545,7 @@ function module_builder_page_generate($form, &$form_state) {
 
   /*
   $form['code_instructions'] = array(
-    '#value' => t('Please copy and paste the following text into a file called !module.', array('!module' => $form_state['values']['module_root_name'] .'.module')),
+    '#value' => t('Please copy and paste the following text into a file called !module.', array('!module' => $form_state['values']['root_name'] .'.module')),
     '#prefix' => '<div id="module-message">',
     '#suffix' => '</div>',
   );
