@@ -1,5 +1,6 @@
-# drupal_starterkit
-drupal starterkit site
+# Drupal starter kit
+Drupal starter kit theme.
 
-username: admin
-password: admin
+### Getting started
+* username: admin
+* password: admin
