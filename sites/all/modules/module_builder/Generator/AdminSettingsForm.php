@@ -2,22 +2,30 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\AdminSettingsForm.
+ * Contains ModuleBuilder\Generator\AdminSettingsForm.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Component generator: admin form for modules.
- *
- * TODO:
- *  - full menu item definition
- *  - line in .info file giving the config path
  */
 class AdminSettingsForm extends Form {
 
   /**
-   * @inheritdoc
+   * Override the parent to set the code file.
+   */
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
+    // Set some default properties.
+    $component_data += array(
+      'code_file' => '%module.admin.inc',
+    );
+
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public static function requestedComponentHandling() {
     return 'singleton';
@@ -29,32 +37,15 @@ class AdminSettingsForm extends Form {
   protected function requiredComponents() {
     $components = parent::requiredComponents();
 
-    // This takes care of adding hook_menu() and so on.
+    // Change the body of the form builder.
     $form_name = $this->getFormName();
-    $components['admin/config/%module'] = array(
-      'component_type' => 'RouterItem',
-      'title' => 'Administer %readable',
-      'page callback' => 'drupal_get_form',
-      'page arguments' => "array('{$form_name}')",
-      'access arguments' => "array('administer %module')",
-    );
+    $form_builder = $form_name;
+    $form_validate  = $form_name . '_validate';
+    $form_submit    = $form_name . '_submit';
 
-    $components['Permissions'] = array(
-      'component_type' => 'Permissions',
-      'request_data' => array(
-        'administer %module',
-      ),
-    );
-
-    return $components;
-  }
-
-  /**
-   * Called by ModuleCodeFile to collect functions from its child components.
-   */
-  public function componentFunctions() {
-    // Override the default code bodies.
-    $this->component_data['form_code_bodies']['builder'] = array(
+    // Override the form builder's location and code.
+    $components[$form_builder]['code_file'] = '%module.admin.inc';
+    $components[$form_builder]['body'] = array(
       "£form['%module_variable_foo'] = array(",
       "  '#type' => 'textfield',",
       "  '#title' => t('Foo'),",
@@ -62,13 +53,32 @@ class AdminSettingsForm extends Form {
       "  '#required' => TRUE,",
       ");",
       "",
-      "// TODO! You probably don't need validation or submit handlers if using system_settings_form().",
       "return system_settings_form(£form);",
     );
 
-    $functions = parent::componentFunctions();
+    // Remove the form validation and submit handlers, as Drupal core takes care
+    // of this for system settings.
+    unset($components[$form_validate]);
+    unset($components[$form_submit]);
 
-    return $functions;
+    // This takes care of adding hook_menu() and so on.
+    $form_name = $this->getFormName();
+    $components['admin/config/TODO-SECTION/%module'] = array(
+      'component_type' => 'RouterItem',
+      'title' => 'Administer %readable',
+      'description' => 'Configure settings for %readable.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => "array('{$form_name}')",
+      'access arguments' => "array('administer %module')",
+      'file' => '%module.admin.inc',
+    );
+
+    $components['Permission'] = array(
+      'component_type' => 'Permission',
+      'permission' => 'administer %module',
+    );
+
+    return $components;
   }
 
   /**

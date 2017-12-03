@@ -2,15 +2,16 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Form.
+ * Contains ModuleBuilder\Generator\Form.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator class for forms.
  *
- * Fuzzy component which itself contains other components.
+ * This doesn't participate in the tree, but creates PHPFunction components
+ * which do.
  */
 class Form extends BaseGenerator {
 
@@ -19,6 +20,7 @@ class Form extends BaseGenerator {
    *
    * A Form generator should use as its name the form ID.
    */
+   // ARGH will clash with func name :()
   public $name;
 
   /**
@@ -32,38 +34,68 @@ class Form extends BaseGenerator {
    *   Valid properties are:
    *      - 'code_file': The code file to place this form in. This may contain
    *        placeholders.
-   *      - 'form_code_bodies': (optional) An array of code bodies. Each should
-   *        be in a format suitable to return from componentFunctions(). Any or
-   *        all of the following keys may be present:
-   *        - 'builder': The form builder.
-   *        - 'validate': The validate handler.
-   *        - 'submit': The submit handler.
    */
-  function __construct($component_name, $component_data = array()) {
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
     // Set some default properties.
     $component_data += array(
       'code_file' => '%module.module',
-      'form_code_bodies' => array(),
     );
 
-    parent::__construct($component_name, $component_data);
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
   }
 
   /**
    * Return an array of subcomponent types.
    */
   protected function requiredComponents() {
-    // Request the file we belong to.
-    return array(
-      $this->component_data['code_file'] => 'ModuleCodeFile',
-    );
-  }
+    $form_name = $this->getFormName();
+    $form_builder   = $form_name;
+    $form_validate  = $form_name . '_validate';
+    $form_submit    = $form_name . '_submit';
 
-  /**
-   * Return this component's parent in the component tree.
-   */
-  function containingComponent() {
-    return $this->component_data['code_file'];
+    $components = array(
+      // Request the file we belong to.
+      $this->component_data['code_file'] => 'ModuleCodeFile',
+      // Request the form functions.
+      $form_builder => array(
+        'component_type' => 'PHPFunction',
+        'code_file' => '%module.module',
+        'doxygen_first' => 'Form builder.',
+        'declaration' => "function $form_builder(£form, &£form_state)",
+        'body' => array(
+          "£form['element] = array(",
+          "  '#type' => 'textfield',",
+          "  '#title' => t('Enter a value'),",
+          "  '#required' => TRUE,",
+          ");",
+          "",
+          "return £form;",
+        ),
+        'body_indent' => 2,
+      ),
+      $form_name . '_validate' => array(
+        'component_type' => 'PHPFunction',
+        'code_file' => '%module.module',
+        'doxygen_first' => 'Form validate handler.',
+        'declaration' => "function $form_validate(£form, &£form_state)",
+        'body' => array(
+          "if (£form_state['values']['element'] != 'hello') {",
+          "  form_set_error('element', t('Please say hello?'));",
+          "}",
+        ),
+        'body_indent' => 2,
+      ),
+      $form_name . '_submit' => array(
+        'component_type' => 'PHPFunction',
+        'code_file' => '%module.module',
+        'doxygen_first' => 'Form submit handler.',
+        'declaration' => "function $form_submit(£form, &£form_state)",
+        'body' => '',
+        'body_indent' => 2,
+      ),
+    );
+
+    return $components;
   }
 
   /**
@@ -76,55 +108,6 @@ class Form extends BaseGenerator {
    */
   protected function getFormName() {
     return $this->name;
-  }
-
-  /**
-   * Called by ModuleCodeFile to collect functions from its child components.
-   */
-  public function componentFunctions() {
-    $form_builder   = $this->getFormName();
-    $form_validate  = $form_builder . '_validate';
-    $form_submit    = $form_builder . '_submit';
-
-    // Default code bodies for the three functions.
-    $form_code_bodies = $this->component_data['form_code_bodies'] + array(
-      'builder' => array(
-        "£form['element] = array(",
-        "  '#type' => 'textfield',",
-        "  '#title' => t('Enter a value'),",
-        "  '#required' => TRUE,",
-        ");",
-        "",
-        "return £form;",
-      ),
-      'validate' => array(
-        "if (£form_state['values']['element'] != 'hello') {",
-        "  form_set_error('element', t('Please say hello?'));",
-        "}",
-      ),
-      'submit' => '',
-    );
-
-    return array(
-      // The form builder itself.
-      $form_builder => array(
-        'doxygen_first' => 'Form builder.',
-        'declaration'   => "function $form_builder" . '($form, &$form_state)',
-        'code'          => $form_code_bodies['builder'],
-      ),
-      // The validate handler.
-      $form_validate => array(
-        'doxygen_first' => 'Form validate handler.',
-        'declaration'   => "function $form_validate" . '($form, &$form_state)',
-        'code'          => $form_code_bodies['validate'],
-      ),
-      // The submit handler.
-      $form_submit => array(
-        'doxygen_first' => 'Form submit handler.',
-        'declaration'   => "function $form_submit" . '($form, &$form_state)',
-        'code'          => $form_code_bodies['submit'],
-      ),
-    );
   }
 
 }

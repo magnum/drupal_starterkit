@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\Collect8.
+ * Contains ModuleBuilder\Task\Collect8.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for collecting and processing component definitions.
@@ -79,7 +79,8 @@ class Collect8 extends Collect {
       if (empty($parent_constructor_call)) {
         // We can't find the parent constructor call -- this plugin manager is
         // doing something different.
-        drush_print("Unable to find call to parent constructor in plugin manager class constructor method for service $plugin_manager_service_id, class $plugin_manager.");
+        // TODO: show a notice in all environments.
+        //drush_print("Unable to find call to parent constructor in plugin manager class constructor method for service $plugin_manager_service_id, class $plugin_manager.");
         continue;
       }
 
@@ -276,8 +277,8 @@ class Collect8 extends Collect {
    * @see module_builder_module_builder_info().
    */
   private function getHookDestinations(&$hook_files) {
-    // Get data by invoking our hook.
-    $data = $this->environment->invokeInfoHook();
+    // Get our data.
+    $data = $this->getHookInfo();
 
     // Incoming data is destination key, array of hooks.
     // (Because it makes typing the data out easier! Computers can just adapt.)
@@ -319,7 +320,7 @@ class Collect8 extends Collect {
    *
    * This invokes hook_hook_info().
    */
-  protected function getHookInfo($file_data) {
+  protected function getDrupalHookInfo($file_data) {
     // Note that the 'module' key is flaky: some modules use a different name
     // for their api.php file.
     $module = $file_data['module'];
@@ -329,6 +330,13 @@ class Collect8 extends Collect {
     }
 
     return $hook_info;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getAdditionalHookInfo() {
+    return array();
   }
 
 }

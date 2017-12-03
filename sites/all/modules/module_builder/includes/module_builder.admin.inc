@@ -63,14 +63,22 @@ function module_builder_admin_settings($form, &$form_state) {
  * Admin hook update form.
  */
 function module_builder_admin_update($form, &$form_state) {
-  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI', VERSION);
 
   // Get our task, and check hook data is ready.
   try {
     $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookDataFolder');
   }
-  catch (\ModuleBuilder\Exception $e) {
-    drupal_set_message($e->getMessage(), 'warning');
+  catch (\ModuleBuilder\Exception\SanityException $e) {
+    $failed_sanity_level = $e->getFailedSanityLevel();
+    switch ($failed_sanity_level) {
+      case 'hook_directory':
+        drupal_set_message(t("The hook data directory could not be created or is not writable."), 'error');
+        break;
+      case 'hook_data':
+        drupal_set_message(t("Hook data is not available. Use the 'Process data' tab to get data about hooks and plugins."), 'error');
+        break;
+    }
     return $form;
   }
 
@@ -84,7 +92,9 @@ function module_builder_admin_update($form, &$form_state) {
   $form['last_update'] = array(
     '#markup' => '<p>' . (
       $last_update ?
-        t('Your last hook documentation update was %date.', array('%date' => $last_update)) :
+        t('Your last hook documentation update was %date.', array(
+          '%date' => format_date($last_update, 'large'),
+        )) :
         t('The hook documentation has not yet been downloaded.')
       ) . '</p>',
   );
@@ -108,7 +118,7 @@ function module_builder_admin_update($form, &$form_state) {
  * Admin hook update form submit handler.
  */
 function module_builder_admin_update_submit($form, $form_state) {
-  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI', VERSION);
 
   // Safe to do this without exception handling: it's already been checked in
   // the form builder.

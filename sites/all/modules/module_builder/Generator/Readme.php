@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Readme.
+ * Contains ModuleBuilder\Generator\Readme.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator base class for module README file.
@@ -15,9 +15,16 @@ namespace ModuleBuider\Generator;
 class Readme extends File {
 
   /**
+   * {@inheritdoc}
+   */
+  public static function requestedComponentHandling() {
+    return 'singleton';
+  }
+
+  /**
    * Collect the code files.
    */
-  function collectFiles(&$files) {
+  public function getFileInfo() {
     $files['readme'] = array(
       'path' => '', // Means the base folder.
       // The extension is in lowercase for good reasons which I don't remember
@@ -28,6 +35,7 @@ class Readme extends File {
       // breaks.
       'join_string' => "\n",
     );
+    return $files;
   }
 
   /**

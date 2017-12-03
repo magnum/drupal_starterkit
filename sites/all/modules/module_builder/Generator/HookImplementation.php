@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\HookImplementation.
+ * Contains ModuleBuilder\Generator\HookImplementation.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator for a single hook implementation.
@@ -28,6 +28,27 @@ class HookImplementation extends PHPFunction {
    * @see getHookDeclarations() for format.
    */
   protected $hook_info;
+
+  /**
+   * Constructor.
+   *
+   * @param $component_name
+   *  The name of a function component should be its function (or method) name.
+   * @param $component_data
+   *   An array of data for the component. Any missing properties are given
+   *   default values. Valid properties in addition to those from parent classes
+   *   are:
+   *     - 'hook_name': The full name of the hook.
+   */
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
+    // Set defaults.
+    $component_data += array(
+      'doxygen_first' => $this->hook_doxygen_text($component_data['hook_name']),
+    );
+
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
+  }
+
 
   /**
    * Declares the subcomponents for this component.
@@ -66,28 +87,19 @@ class HookImplementation extends PHPFunction {
   }
 
   /**
-   * Called by ModuleCodeFile to collect functions from its child components.
+   * {@inheritdoc}
    */
-  public function componentFunctions() {
-    // Replace 'hook_' prefix in the function declaration with a placeholder.
-    $declaration = preg_replace('/(?<=function )hook/', '%module', $this->hook_info['definition']);
-    return array(
-      $this->name => array(
-        'doxygen_first' => $this->hook_doxygen_text($this->hook_info['name']),
-        'declaration'   => $declaration,
-        // TODO: get the hook template from user-defined stuff.
-        // TODO: how does something like hook_menu() add menu items???
-        'code'          => $this->hook_info['body'],
-        'has_wrapping_newlines'  => TRUE,
-      ),
-    );
+  public function buildComponentContents($children_contents) {
+    // Replace the 'hook_' part of the function declaration.
+    $this->component_data['declaration'] = preg_replace('/(?<=function )hook/', '%module', $this->component_data['declaration']);
 
+    // TODO: get the hook template from user-defined stuff.
     /*
     // Old code, adapt here:
     // See if function bodies exist; if so, use function bodies from template
     if (isset($hook['template'])) {
       // Strip out INFO: comments for advanced users
-      if (!\ModuleBuilder\Factory::getEnvironment()->getSetting('module_builder_detail', 0)) {
+      if (!\ModuleBuilder\Factory::getEnvironment()->getSetting('detail_level', 0)) {
         // Used to strip INFO messages out of generated file for advanced users.
         $pattern = '#\s+/\* INFO:(.*?)\*FILLERDONTCLOSECOMMENT/#ms';
         $hook['template'] = preg_replace($pattern, '', $hook['template']);
@@ -97,6 +109,8 @@ class HookImplementation extends PHPFunction {
       $function_code .= $hook['template'];
     }
     */
+
+    return parent::buildComponentContents($children_contents);
   }
 
   /**
@@ -110,21 +124,3 @@ class HookImplementation extends PHPFunction {
   }
 
 }
-
-/**
- * Generator class for hook implementations for Drupal 6.
- */
-class HookImplementation6 extends HookImplementation {
-
-  /**
-   * Make the doxygen first line for a given hook with the Drupal 6 format.
-   *
-   * @param
-   *   The long hook name, eg 'hook_menu'.
-   */
-  function hook_doxygen_text($hook_name) {
-    return "Implementation of $hook_name().";
-  }
-
-}
-

@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\PHPFile.
+ * Contains ModuleBuilder\Generator\PHPFile.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator for general PHP code files.
@@ -14,40 +14,30 @@ namespace ModuleBuider\Generator;
  */
 class PHPFile extends File {
 
+  use PHPFormattingTrait;
+
   /**
    * An array of functions for this file.
    *
-   * @see assembleContainedComponentsHelper()
+   * @see buildComponentContents()
    * @see code_body()
    */
   protected $functions = array();
 
   /**
-   * Helper for assembleContainedComponents().
-   *
-   * Module code files assemble their contained components, which are functions.
-   *
-   * This collects data from our contained components. The functions are
-   * assembled in full in code_body().
+   * {@inheritdoc}
    */
-  function assembleContainedComponentsHelper($children) {
-    $component_list = $this->getComponentList();
+  function buildComponentContents($children_contents) {
+    // TEMPORARY, until Generate task handles returned contents.
+    $this->functions = $children_contents;
 
-    foreach ($children as $child_name) {
-      // Get the child component.
-      $child_component = $component_list[$child_name];
-
-      $child_functions = $child_component->componentFunctions();
-      // Why didn't array_merge() work here? Cookie for the answer!
-      $this->functions += $child_functions;
-    }
+    return array();
   }
 
   /**
    * Return the contents of the file.
    *
-   * Helper for subclasses' implementations of collectFiles(). Serves to
-   * concatenate standard pieces of the file.
+   * Helper for subclasses. Serves to concatenate standard pieces of the file.
    *
    * @return
    *  An array of text strings, in the correct order for concatenation.
@@ -64,17 +54,16 @@ class PHPFile extends File {
     $file_contents = array_merge(
       array(
         $this->file_header(),
-        $this->code_header(),
       ),
-      // The code body is itself an array.
-      $this->code_body(),
-      array(
-        $this->code_footer(),
-      )
+      // The code header and body are themselves arrays.
+      $this->code_header(),
+      $this->code_body()
     );
 
-    // Filter out any empty elements.
-    $file_contents = array_filter($file_contents);
+    if (!empty($this->code_footer())) {
+      $file_contents[] = $this->code_footer();
+    }
+
     return $file_contents;
   }
 
@@ -91,16 +80,41 @@ class PHPFile extends File {
    * Expects $this->filename to be set.
    */
   function code_header() {
-    $filename = $this->filename;
-    $file_description = $this->file_doc_summary();
-    $code = <<<EOT
-/**
- * @file $filename
- * $file_description
- */
-
-EOT;
+    $lines = array(
+      "@file",
+      $this->file_doc_summary(),
+    );
+    $code = $this->docBlock($lines);
+    // Blank line after the file docblock.
+    $code[] = '';
     return $code;
+  }
+
+  /**
+   * Return the main body of the file code.
+   *
+   * @return
+   *  An array of code lines.
+   */
+  function code_body() {
+    $code_body = array();
+
+    // Function data has been set by buildComponentContents().
+    foreach ($this->functions as $component_name => $function_lines) {
+      $code_body = array_merge($code_body, $function_lines);
+      // Blank line after the function.
+      $code_body[] = '';
+    }
+
+    // If there are no functions, then this is a .module file that's been
+    // requested so the module is correctly formed. It is customary to add a
+    // comment to the file for DX.
+    if (empty($code_body)) {
+      $code_body['empty'] = "// Drupal needs this blank file.";
+      $code_body[] = '';
+    }
+
+    return $code_body;
   }
 
   /**
@@ -111,55 +125,8 @@ EOT;
   }
 
   /**
-   * Create a doxygen block for a function.
-   *
-   * @param $text
-   *  The first line of text for the doxygen block.
-   */
-  function function_doxygen($text) {
-    return array(
-      '/**',
-      " * $text",
-      ' */',
-    );
-  }
-
-  /**
    * Return a file footer.
    */
   function code_footer() {}
-
-  /**
-   * Helper to format text as docblock.
-   *
-   * @param @lines
-   *  An array of lines, or a single line of text. Lines to be normally indented
-   *  should have no leading whitespace.
-   *
-   * @return
-   *  A string of docblock with start and end PHP comment markers.
-   */
-  function docBlock($lines) {
-    if (!is_array($lines)) {
-      $lines = array($lines);
-    }
-
-    $lines = array_merge(
-      array("/**"),
-      array_map(array($this, 'docblockLine'), $lines),
-      array(" */")
-    );
-
-    return implode("\n", $lines) . "\n";
-  }
-
-  /**
-   * Callback for array_map().
-   *
-   * Formats a single inner line of docblock.
-   */
-  function docblockLine($line) {
-    return " * $line";
-  }
 
 }

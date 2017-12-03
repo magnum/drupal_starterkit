@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Hooks.
+ * Contains ModuleBuilder\Generator\Hooks.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator base class for module hooks.
@@ -20,9 +20,25 @@ namespace ModuleBuider\Generator;
  *
  * TODO: make this work for theme hooks too?
  *
- * @see ModuleBuider\Generator\ModuleCodeFile
+ * @see ModuleBuilder\Generator\ModuleCodeFile
  */
 class Hooks extends BaseGenerator {
+
+  /**
+   * Constructor.
+   *
+   * @param $component_name
+   *  The name of a function component should be its function (or method) name.
+   * @param $component_data
+   *  An array of data for the component. Any missing properties are given
+   *  default values. Valid properties in addition to those from parent classes
+   *  are:
+   *    - 'hooks': An array of requested hooks, where the keys are the long hook
+   *      names and the values are TRUE.
+   */
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
+  }
 
   /**
    * Declares the subcomponents for this component.
@@ -44,28 +60,25 @@ class Hooks extends BaseGenerator {
 
     // Just translate the variable for easier frankencoding for now!
     $module_data = $this->base_component->component_data;
+    $requested_hook_list = $this->component_data['hooks'];
 
     // Force hook_help() if there is help text in the incoming data.
     if (isset($module_data['module_help_text'])) {
-      $module_data['hooks']['hook_help'] = TRUE;
-      $components['hook_help'] = 'HookImplementation';
+      $requested_hook_list['hook_help'] = TRUE;
     }
 
     // Get a set of hook declarations and function body templates for the hooks
     // we want. This is of the form:
     //   'hook_foo' => array( 'declaration' => DATA, 'template' => DATA )
-    $hook_file_data = $this->getTemplates($module_data);
-    // Set this on the global component data for use by subcomponents.
-    // TODO: is anyone using this?
-    $this->base_component->component_data['hook_file_data'] = $hook_file_data;
+    $hook_file_data = $this->getTemplates($module_data, $requested_hook_list);
 
     // Determine whether we need to filter the code files or not.
-    // If the build request is 'code', 'all', or 'hooks, then we don't filter,
-    // and return everything.
+    // If the build request is empty, or one of 'code', 'all', or 'hooks, then
+    // we don't filter, and return everything.
     // TODO: move this logic further up the chain?
     $build_list = $module_data['requested_build'];
     //drush_print_r($build_list);
-    if (isset($build_list['all']) || isset($build_list['code']) || isset($build_list['hooks'])) {
+    if (empty($build_list) || isset($build_list['all']) || isset($build_list['code']) || isset($build_list['hooks'])) {
       $filter_generators = FALSE;
     }
     else {
@@ -73,7 +86,7 @@ class Hooks extends BaseGenerator {
     }
 
     // Work over this and add our HookImplentation.
-    foreach ($hook_file_data as $filename => $hook_data) {
+    foreach ($hook_file_data as $filename => $file_hook_list) {
       // If we are set to filter, and the abbreviated filename isn't in the
       // build list, skip it.
       // TODO: this is kinda messy, and assumes that the abbreviated name is
@@ -84,7 +97,7 @@ class Hooks extends BaseGenerator {
       }
 
       // Add a HookImplementation component for each hook.
-      foreach ($hook_data as $hook_name => $hook) {
+      foreach ($file_hook_list as $hook_name => $hook) {
         // Figure out if there is a dedicated generator class for this hook.
         // TODO: is it really worth this faff? How many will we have, apart from
         // hook_menu? Is coding this a) slow and b) YAGNI?
@@ -98,7 +111,14 @@ class Hooks extends BaseGenerator {
           $hook_class_name = 'HookImplementation';
         }
 
-        $components[$hook_name] = $hook_class_name;
+        $components[$hook_name] = array(
+          'component_type' => $hook_class_name,
+          'code_file' => $hook['destination'],
+          'hook_name' => $hook_name,
+          'declaration' => $hook['definition'],
+          'body' => $hook['body'],
+          'has_wrapping_newlines' => TRUE,
+        );
       }
     }
 
@@ -115,26 +135,36 @@ class Hooks extends BaseGenerator {
    * alter their custom hook templates.
    *
    * @return
-   *   An array whose keys are destination filenames with the token '%module',
-   *   and whose values are arrays of hook data. The hook data keys are:
-   *    - declaration: The function declaration, with the 'hook' part not
+   *   An array of hook data grouped by destination file, whose keys are the
+   *   filenames of destination files with the token '%module', and whose values
+   *   further arrays. The nested arrays' keys are long hook names and the
+   *   values are arrays of hook data as follows:
+   *    - 'type': One of 'hook' or 'callback'.
+   *    - 'name': The long hook name (i.e. 'hook_boot' rather than 'boot').
+   *    - 'definition': The function declaration, with the 'hook' part not
    *        yet replaced.
-   *    - destination: The destination, with tokens still in place.
+   *    - 'destination': The destination, with tokens still in place.
+   *    - 'group': The name of the api.php file this was defined in, without the
+   *      'api.php' suffix.
+   *    - 'body': The sample body code of the hook from the definition.
    *    - template_files: A list of template file types, in order of preference,
    *        keyed by filename and with the value TRUE if the hook code exists
    *        in that template file.
    *    - template (optional): The template code, if any was found.
    *   Example:
    *  'destination file' => array(
-   *    'hook_foo' => array('declaration' => DATA, 'template' => DATA)
+   *    'hook_foo' => array(
+   *      'declaration' => DATA,
+   *      'template' => DATA,
+   *      // ...etc
+   *    )
    */
-  function getTemplates($module_data) {
+  function getTemplates($module_data, $requested_hook_list) {
     // Sanity checks already done at this point; no need to catch exception.
     $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
 
-    // Build a clean list of the requested hooks, by filtering out the keys
-    // with 0 values that come from UI form.
-    $requested_hooks = array_filter($module_data['hooks']);
+    // Frankencoding to old variable names.
+    $requested_hooks = $requested_hook_list;
     //print_r($requested_hooks);
     // TODO: might not need this; easier to test truth than isset.
 

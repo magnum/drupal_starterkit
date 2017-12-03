@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\ReportHookPresets.
+ * Contains ModuleBuilder\Task\ReportHookPresets.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for reporting on hook presets and templates.
@@ -15,7 +15,7 @@ class ReportHookPresets extends Base {
   /**
    * The sanity level this task requires to operate.
    */
-  protected $sanity_level = 'hook_data';
+  protected $sanity_level = 'component_data_processed';
 
   /**
    * Returns the contents of a template file.
@@ -23,23 +23,23 @@ class ReportHookPresets extends Base {
    * TODO: this will eventually return either the user version or the module version.
    * TODO: IS THIS IN THE RIGHT FILE???
    *
-   * (Replaces module_builder_get_template().)
-   *
    * @param $filename
    *  The filename of the template file to read.
    *
    * @return
    *  The contents of the file, or NULL if the file is not found.
    *
-   * @throws
-   *  Throws \ModuleBuilder\Exception if the file can't be found.
+   * @throws \Exception
+   *  Throws an exception if the file can't be found.
    */
   protected function loadPresetsFile($filename) {
     $pieces = array('templates', $this->environment->getCoreMajorVersion(), $filename);
     $path = $this->environment->getPath(implode('/', $pieces));
 
     if (!file_exists($path)) {
-      throw new \ModuleBuilder\Exception("Unable to find template at $path.");
+      throw new \Exception(strtr("Unable to find template at !path.", array(
+        '!path' => htmlspecialchars($path, ENT_QUOTES, 'UTF-8'),
+      )));
     }
 
     $template_file = file_get_contents($path);
@@ -52,8 +52,6 @@ class ReportHookPresets extends Base {
    * A preset is a collection of hooks with a machine name and a descriptive
    * label. Presets allow quick selection of hooks that are commonly used
    * together, eg those used to define a node type, or blocks.
-   *
-   * (Replaces module_builder_get_hook_presets().)
    *
    * @return
    *  An array keyed by preset name, whose values are arrays of the form:

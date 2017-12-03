@@ -2,13 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\ReportHookData.
+ * Contains ModuleBuilder\Task\ReportHookData.
  */
 
-namespace ModuleBuider\Task;
-
-// We have no autoloading for Tasks.
-include_once(dirname(__FILE__) . "/ReportHookDataFolder.php");
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for reporting on hook data.
@@ -20,12 +17,10 @@ class ReportHookData extends ReportHookDataFolder {
   /**
    * The sanity level this task requires to operate.
    */
-  protected $sanity_level = 'hook_data';
+  protected $sanity_level = 'component_data_processed';
 
   /**
    * Get the list of hook data.
-   *
-   * (Replaces module_builder_get_hook_data().)
    *
    * @return
    *  The unserialized contents of the processed hook data file.
@@ -54,8 +49,6 @@ class ReportHookData extends ReportHookDataFolder {
   /**
    * Get just hook names.
    *
-   * (Replaces module_builder_get_hook_names().)
-   *
    * @param $style
    *   Whether to return hook names as just 'init' or 'hook_init'. One of:
    *    - 'short': Return short names, i.e., 'init'.
@@ -78,18 +71,42 @@ class ReportHookData extends ReportHookDataFolder {
   }
 
   /**
-   * Get hooks as a list of nested options.
+   * Get hooks as a list of options.
    *
    * @return
    *   An array of hooks as options suitable for FormAPI, where each key is a
    *   full hook name, and each value is a description.
    */
-  function listHookNamesOptions($style = 'full') {
+  function listHookNamesOptions() {
     $data = $this->getHookDeclarations();
 
     $return = array();
     foreach ($data as $hook_name => $hook_info) {
-      $return[$hook_info['group']][$hook_name] = $hook_info['description'];
+      $return[$hook_name] = $hook_info['description'];
+    }
+
+    return $return;
+  }
+
+  /**
+   * Get hooks as a grouped list with data about each item.
+   *
+   * @return
+   *   An array keyed by hook group, whose items are in turn arrays keyed by
+   *   hook name, and whose items in turn are arrays with the following
+   *   properties:
+   *    - 'type' One of 'hook' or 'callback'.
+   *    - 'description' The first line from the hook definition's docblock.
+   */
+  public function listHookOptionsStructured() {
+    $data = $this->getHookDeclarations();
+
+    $return = array();
+    foreach ($data as $hook_name => $hook_info) {
+      $return[$hook_info['group']][$hook_name] = array(
+        'description' => $hook_info['description'],
+        'type' => $hook_info['type'],
+      );
     }
 
     return $return;
@@ -97,8 +114,6 @@ class ReportHookData extends ReportHookDataFolder {
 
   /**
    * Get stored hook declarations, keyed by hook name, with destination.
-   *
-   * (Replaces module_builder_get_hook_declarations().)
    *
    * @return
    *  An array of hook information, keyed by the full name of the hook

@@ -34,7 +34,7 @@ class ModuleBuilderModuleGenerationTestCase extends DrupalUnitTestCase {
     parent::setUp();
 
     // Perform the work of module_builder_init().
-    include_once(dirname(__FILE__) . '/../ModuleBuilderFactory.php');
+    include_once(dirname(__FILE__) . '/../Factory.php');
 
     // We rely on our own autoloader, but Drupal's core autoloaders are still
     // registered, and they will run first and crash -- so we remove them.
@@ -47,7 +47,7 @@ class ModuleBuilderModuleGenerationTestCase extends DrupalUnitTestCase {
    * Test generating module code.
    */
   function testModuleGeneration() {
-    \ModuleBuilder\Factory::setEnvironmentClass('TestsSampleLocation');
+    \ModuleBuilder\Factory::setEnvironmentClass('TestsSampleLocation', VERSION);
 
     // Get the hooks directory. WHY?
     $hooks_directory = \ModuleBuilder\Factory::getEnvironment()->getHooksDirectory();
@@ -177,7 +177,7 @@ class ModuleBuilderModuleGenerationTestCase extends DrupalUnitTestCase {
    *  An array of files.
    */
   function generateModuleFiles($module_data) {
-    \ModuleBuilder\Factory::setEnvironmentClass('TestsSampleLocation');
+    \ModuleBuilder\Factory::setEnvironmentClass('TestsSampleLocation', VERSION);
     $mb_task_handler_generate = \ModuleBuilder\Factory::getTask('Generate', 'module');
     $root_generator = $mb_task_handler_generate->getRootGenerator();
     $component_data_info = $root_generator->getComponentDataInfo();
@@ -388,7 +388,7 @@ class ModuleBuilderHookCollectionTestCase extends DrupalUnitTestCase {
   }
 
   function testHookCollection() {
-    \ModuleBuilder\Factory::setEnvironmentClass('TestsTempLocation');
+    \ModuleBuilder\Factory::setEnvironmentClass('TestsTempLocation', VERSION);
 
     $mb_task_handler_collect = \ModuleBuilder\Factory::getTask('Collect');
     $this->assertTrue(is_object($mb_task_handler_collect), "A task handler object was returned.");

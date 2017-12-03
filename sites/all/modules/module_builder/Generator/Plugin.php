@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Plugin.
+ * Contains ModuleBuilder\Generator\Plugin.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator for a plugin.
@@ -38,7 +38,7 @@ class Plugin extends PHPFile {
    *      TODO: since the classnames are unique regardless of namespace, figure
    *      out if there is a way of just specifying the classname.
    */
-  function __construct($component_name, $component_data = array()) {
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
     // Set some default properties.
     $component_data += array();
 
@@ -48,11 +48,11 @@ class Plugin extends PHPFile {
 
     $component_data['plugin_type_data'] = $plugin_data;
 
-    parent::__construct($component_name, $component_data);
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
   }
 
   /**
-   * @inheritdoc
+   * {@inheritdoc}
    */
   public static function requestedComponentHandling() {
     return 'repeat';
@@ -61,12 +61,12 @@ class Plugin extends PHPFile {
   /**
    * Build the code files.
    */
-  function collectFiles(&$files) {
+  public function getFileInfo() {
     // TODO: can these be set up in the constructor? -- but we don't have access
     // to the base component property yet.
     // Create a class name.
     // TODO: allow this to be set in the component data.
-    $this->component_data['class_name'] = $this->base_component->component_data['module_camel_case_name']
+    $this->component_data['class_name'] = $this->base_component->component_data['camel_case_name']
       . ucfirst($this->name);
 
     $this->component_data['namespace'] = implode('\\', array(
@@ -90,6 +90,7 @@ class Plugin extends PHPFile {
       // component is responsible for ending its own lines.
       'join_string' => "\n",
     );
+    return $files;
   }
 
   /**
@@ -106,12 +107,10 @@ class Plugin extends PHPFile {
    * rewriting!
    */
   function code_body() {
-    // Splice these together so they're not joined by a blank line.
-    $class_code = $this->class_annotation() . $this->class_body();
-
     return array(
       $this->code_namespace(),
-      $class_code,
+      $this->class_annotation(),
+      $this->class_body(),
     );
   }
 
@@ -166,7 +165,7 @@ class Plugin extends PHPFile {
     $code = array();
 
     foreach ($this->component_data['plugin_type_data']['plugin_interface_methods'] as $interface_method_name => $interface_method_data) {
-      $function_doc = $this->function_doxygen('{@inheritdoc}');
+      $function_doc = $this->docBlock('{@inheritdoc}');
       $code = array_merge($code, $function_doc);
 
       // Trim the semicolon from the end of the interface method.
@@ -174,7 +173,7 @@ class Plugin extends PHPFile {
 
       $code[] = "$method_declaration {";
       // Add a comment with the method's first line of docblock, so the user
-      // has something more informative than '@inheritdoc' to go on!
+      // has something more informative than '{@inheritdoc}' to go on!
       $code[] = '  // ' . $interface_method_data['description'];
       $code[] = '}';
       $code[] = '';

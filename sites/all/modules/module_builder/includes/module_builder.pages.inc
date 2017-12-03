@@ -58,7 +58,7 @@ function module_builder_page($form, &$form_state) {
  * Form builder for page 1.
  */
 function module_builder_page_input($form, &$form_state) {
-  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI', VERSION);
 
   // Get our task handler, which checks hook data is ready, and our generate
   // handler, from which to get the list of properties to collect.
@@ -66,8 +66,8 @@ function module_builder_page_input($form, &$form_state) {
     $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
     $mb_task_handler_generate = \ModuleBuilder\Factory::getTask('Generate', 'module');
   }
-  catch (\ModuleBuilder\Exception $e) {
-    if ($e->needs_hooks_download) {
+  catch (\ModuleBuilder\Exception\SanityException $e) {
+    if ($e->getFailedSanityLevel() == 'component_data_processed') {
       drupal_set_message(t('No hooks were found. Please check the documentation path specified in the <a href="!settings-url">%administer >> %config >> %develop >> %modulebuilder</a> page.',
         array(
           '!settings-url' => url('admin/config/development/module_builder'),
@@ -109,6 +109,8 @@ function module_builder_page_input($form, &$form_state) {
       else {
         $element['#type'] = 'textarea';
         $element['#description'] = t("Enter one item per line.");
+
+        $element['#default_value'] = implode("\n", $element['#default_value']);
       }
     }
     elseif ($property_info['format'] == 'boolean') {
@@ -139,7 +141,8 @@ function module_builder_page_input($form, &$form_state) {
   //dsm($hook_presets_reverse);
 
   // Rework the hooks form element into fieldsets with checkboxes.
-  $hook_groups = $component_data_info['hooks']['options'];
+  $hook_groups = $mb_task_handler_report->listHookOptionsStructured();
+
   $form['hooks'] = array(
     '#title' => t('Use the following specific hooks'),
     '#tree' => TRUE,
@@ -153,11 +156,16 @@ function module_builder_page_input($form, &$form_state) {
       //'#theme'  => 'module_builder_hook_list',
       '#tree' => TRUE,
     );
-    foreach ($hooks as $hook_name => $hook_description) {
+    foreach ($hooks as $hook_name => $hook_info) {
+      // Skip callbacks.
+      if ($hook_info['type'] == 'callback') {
+        continue;
+      }
+
       $form['hooks'][$hook_group][$hook_name] = array(
         '#type' => 'checkbox',
         '#title' => $hook_name,
-        '#description' => $hook_description,
+        '#description' => $hook_info['description'],
         '#repopulate' => TRUE,
 
         // TODO: For some reason this gives me some wacky error under PHP 5:
@@ -331,7 +339,7 @@ function module_builder_page_input($form, &$form_state) {
   try {
     $mb_task_handler_report_presets = \ModuleBuilder\Factory::getTask('ReportHookPresets');
   }
-  catch (\ModuleBuilder\Exception $e) {
+  catch (\ModuleBuilder\Exception\SanityException $e) {
     // We've already sanity-checked, so doubtful we come here.
     return $form;
   }
@@ -495,7 +503,7 @@ function module_builder_page_input_submit($form, &$form_state) {
  * Form builder for page 2: generate code.
  */
 function module_builder_page_generate($form, &$form_state) {
-  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI');
+  \ModuleBuilder\Factory::setEnvironmentClass('DrupalUI', VERSION);
 
   // Get our task handler. The form builder will already have checked sanity.
   $mb_task_handler_generate = \ModuleBuilder\Factory::getTask('Generate', 'module');

@@ -2,15 +2,22 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Tests.
+ * Contains ModuleBuilder\Generator\Tests.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Component generator: tests.
  */
 class Tests extends PHPFile {
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function requestedComponentHandling() {
+    return 'singleton';
+  }
 
   /**
    * Return an array of subcomponent types.
@@ -23,18 +30,19 @@ class Tests extends PHPFile {
   /**
    * Build the code files.
    */
-  function collectFiles(&$files) {
-    $module_root_name = $this->base_component->component_data['root_name'];
-    $test_file_name = "$module_root_name.test";
+  public function getFileInfo() {
+    $module_root_name = $this->base_component->component_data['camel_case_name'];
+    $test_file_name = $module_root_name . "Test.php";
 
     // The key is arbitrary (at least so far!).
     $files['module.test'] = array(
-      'path' => '', // Means base folder.
-      'filename' => 'tests/' . $test_file_name,
+      'path' => 'src/Tests',
+      'filename' => $test_file_name,
       'body' => $this->file_contents(),
       'join_string' => "\n",
       'contains_classes' => TRUE,
     );
+    return $files;
   }
 
   /**
@@ -50,7 +58,7 @@ class Tests extends PHPFile {
    */
   function code_body() {
     $module_root_name = $this->base_component->component_data['root_name'];
-    $module_camel_case = $this->base_component->component_data['module_camel_case_name'];
+    $module_camel_case = $this->base_component->component_data['camel_case_name'];
     $module_readable_name = $this->base_component->component_data['readable_name'];
 
     $code = <<<EOT

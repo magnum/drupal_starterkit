@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\HookPermission.
+ * Contains ModuleBuilder\Generator\HookPermission.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator for hook_permission() implementation.
@@ -33,52 +33,42 @@ class HookPermission extends HookImplementation {
    *   Valid properties are:
    *      - 'permissions': (optional) An array of permission names.
    */
-  function __construct($component_name, $component_data = array()) {
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
     // Set some default properties.
     $component_data += array(
-      'permissions' => array(),
+      'hook_name' => 'hook_permission',
     );
 
-    parent::__construct($component_name, $component_data);
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
   }
 
   /**
-   * Called by ModuleCodeFile to collect functions from its child components.
+   * {@inheritdoc}
    */
-  public function componentFunctions() {
-    // Get the function data from our parent class first.
-    $return = parent::componentFunctions();
-
-    // If we were requested without any permissions, just return template code.
-    if (empty($this->component_data['permissions'])) {
-      return $return;
+  public function buildComponentContents($children_contents) {
+    // If we have no children, i.e. no RouterItem components, then hand over to
+    // the parent, which will output the default hook code.
+    if (empty($children_contents)) {
+      return parent::buildComponentContents($children_contents);
     }
 
-    // Otherwise, replace the template code with the permissions.
-    // TODO: this is the same pattern as the HookMenu generator: generalize
-    // this in a single class?
+    // Code from child components comes as arrays of code lines, so no need to
+    // trim it.
+    $this->component_data['has_wrapping_newlines'] = FALSE;
+
     $code = array();
-
-    // Opening lines.
-    // DX sugar: use £ for variables in the template code.
-    $code[] = "£permissions = array();";
-    $code[] = "";
-
-    foreach ($this->component_data['permissions'] as $permission_name) {
-      $code[] = "£permissions['$permission_name'] = array(";
-      $code[] = "  'title' => t('TODO: enter permission title'),";
-      $code[] = "  'description' => t('TODO: enter permission description'),";
-      $code[] = ");";
+    $code[] = '£permissions = array();';
+    foreach ($children_contents as $menu_item_lines) {
+      $code = array_merge($code, $menu_item_lines);
     }
+    $code[] = '';
+    $code[] = 'return £permissions;';
 
-    $code[] = "return £permissions;";
+    $this->component_data['body_indent'] = 2;
 
-    $return[$this->name]['code'] = $code;
+    $this->component_data['body'] = $code;
 
-    // We return an array of lines, so we need newlines at start and finish.
-    $return[$this->name]['has_wrapping_newlines'] = FALSE;
-
-    return $return;
+    return parent::buildComponentContents($children_contents);
   }
 
 }

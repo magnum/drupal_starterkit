@@ -2,13 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\Collect5.
+ * Contains ModuleBuilder\Task\Collect5.
  */
 
-namespace ModuleBuider\Task;
-
-// Dirty hack because Task classes don't have autoloading yet.
-include_once(dirname(__FILE__) . "/Collect6.php");
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for collecting and processing hook definitions.

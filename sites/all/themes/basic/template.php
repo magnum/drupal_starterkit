@@ -1,8 +1,10 @@
 <?php
 
 /**
+ * @file
  * Here we override the default HTML output of drupal.
- * refer to https://drupal.org/node/457740
+ *
+ * Refer to https://drupal.org/node/457740.
  */
 
 // Auto-rebuild the theme registry during theme development.
@@ -13,164 +15,173 @@ if (theme_get_setting('clear_registry')) {
   drupal_theme_rebuild();
 }
 
-// Add Zen Tabs styles
+// Add Zen Tabs styles.
 if (theme_get_setting('basic_tabs')) {
-  drupal_add_css( drupal_get_path('theme', 'basic') .'/css/tabs.css');
+  drupal_add_css(drupal_get_path('theme', 'basic') . '/css/tabs.css');
 }
 
-function basic_preprocess_html(&$vars) {
+/**
+ * Implements hook_preprocess_html().
+ */
+function basic_preprocess_html(&$variables) {
   global $user, $language;
 
-  // Add role name classes (to allow css based show for admin/hidden from user)
-  foreach ($user->roles as $role){
-    $vars['classes_array'][] = 'role-' . basic_id_safe($role);
+  // Add role name classes (to allow css based show for admin/hidden from user).
+  foreach ($user->roles as $role) {
+    $variables['classes_array'][] = 'role-' . basic_id_safe($role);
   }
 
   // HTML Attributes
   // Use a proper attributes array for the html attributes.
-  $vars['html_attributes'] = array();
-  $vars['html_attributes']['lang'][] = $language->language;
-  $vars['html_attributes']['dir'][] = $language->dir;
+  $variables['html_attributes'] = array();
+  $variables['html_attributes']['lang'][] = $language->language;
+  $variables['html_attributes']['dir'][] = $language->dir;
 
   // Convert RDF Namespaces into structured data using drupal_attributes.
-  $vars['rdf_namespaces'] = array();
+  $variables['rdf_namespaces'] = array();
   if (function_exists('rdf_get_namespaces')) {
     foreach (rdf_get_namespaces() as $prefix => $uri) {
       $prefixes[] = $prefix . ': ' . $uri;
     }
-    $vars['rdf_namespaces']['prefix'] = implode(' ', $prefixes);
+    $variables['rdf_namespaces']['prefix'] = implode(' ', $prefixes);
   }
 
   // Flatten the HTML attributes and RDF namespaces arrays.
-  $vars['html_attributes'] = drupal_attributes($vars['html_attributes']);
-  $vars['rdf_namespaces'] = drupal_attributes($vars['rdf_namespaces']);
+  $variables['html_attributes'] = drupal_attributes($variables['html_attributes']);
+  $variables['rdf_namespaces'] = drupal_attributes($variables['rdf_namespaces']);
 
-  if (!$vars['is_front']) {
-    // Add unique classes for each page and website section
+  if (!$variables['is_front']) {
+    // Add unique classes for each page and website section.
     $path = drupal_get_path_alias($_GET['q']);
-    list($section, ) = explode('/', $path, 2);
-    $vars['classes_array'][] = 'with-subnav';
-    $vars['classes_array'][] = basic_id_safe('page-'. $path);
-    $vars['classes_array'][] = basic_id_safe('section-'. $section);
+    list($section,) = explode('/', $path, 2);
+    $variables['classes_array'][] = 'with-subnav';
+    $variables['classes_array'][] = basic_id_safe('page-' . $path);
+    $variables['classes_array'][] = basic_id_safe('section-' . $section);
 
     if (arg(0) == 'node') {
       if (arg(1) == 'add') {
         if ($section == 'node') {
-          // Remove 'section-node'
-          array_pop( $vars['classes_array'] );
+          // Remove 'section-node'.
+          array_pop($variables['classes_array']);
         }
-        // Add 'section-node-add'
-        $vars['classes_array'][] = 'section-node-add';
+        // Add 'section-node-add'.
+        $variables['classes_array'][] = 'section-node-add';
       }
       elseif (is_numeric(arg(1)) && (arg(2) == 'edit' || arg(2) == 'delete')) {
         if ($section == 'node') {
-          // Remove 'section-node'
-          array_pop( $vars['classes_array']);
+          // Remove 'section-node'.
+          array_pop($variables['classes_array']);
         }
-        // Add 'section-node-edit' or 'section-node-delete'
-        $vars['classes_array'][] = 'section-node-'. arg(2);
+        // Add 'section-node-edit' or 'section-node-delete'.
+        $variables['classes_array'][] = 'section-node-' . arg(2);
       }
     }
   }
-  //for normal un-themed edit pages
+  // For normal un-themed edit pages.
   if ((arg(0) == 'node') && (arg(2) == 'edit')) {
-    $vars['template_files'][] =  'page';
+    $variables['template_files'][] = 'page';
   }
 
   // Add IE classes.
   if (theme_get_setting('basic_ie_enabled')) {
     $basic_ie_enabled_versions = theme_get_setting('basic_ie_enabled_versions');
     if (in_array('ie8', $basic_ie_enabled_versions, TRUE)) {
-      drupal_add_css(path_to_theme() . '/css/ie8.css', array('group' => CSS_THEME, 'browsers' => array('IE' => 'IE 8', '!IE' => FALSE), 'preprocess' => FALSE));
+      drupal_add_css(path_to_theme() . '/css/ie8.css', array(
+        'group' => CSS_THEME,
+        'browsers' => array('IE' => 'IE 8', '!IE' => FALSE),
+        'preprocess' => FALSE,
+      ));
       drupal_add_js(path_to_theme() . '/js/build/selectivizr-min.js');
     }
     if (in_array('ie9', $basic_ie_enabled_versions, TRUE)) {
-      drupal_add_css(path_to_theme() . '/css/ie9.css', array('group' => CSS_THEME, 'browsers' => array('IE' => 'IE 9', '!IE' => FALSE), 'preprocess' => FALSE));
-    }
-    if (in_array('ie10', $basic_ie_enabled_versions, TRUE)) {
-      drupal_add_css(path_to_theme() . '/css/ie10.css', array('group' => CSS_THEME, 'browsers' => array('IE' => 'IE 10', '!IE' => FALSE), 'preprocess' => FALSE));
+      drupal_add_css(path_to_theme() . '/css/ie9.css', array(
+        'group' => CSS_THEME,
+        'browsers' => array('IE' => 'IE 9', '!IE' => FALSE),
+        'preprocess' => FALSE,
+      ));
     }
   }
-
 }
 
-function basic_preprocess_page(&$vars, $hook) {
-  if (isset($vars['node_title'])) {
-    $vars['title'] = $vars['node_title'];
+/**
+ * Implements hook_preprocess_page().
+ */
+function basic_preprocess_page(&$variables, $hook) {
+  if (isset($variables['node_title'])) {
+    $variables['title'] = $variables['node_title'];
   }
-  // Adding classes whether #navigation is here or not
-  if (!empty($vars['main_menu']) or !empty($vars['sub_menu'])) {
-    $vars['classes_array'][] = 'with-navigation';
+  // Adding classes whether #navigation is here or not.
+  if (!empty($variables['main_menu']) or !empty($variables['sub_menu'])) {
+    $variables['classes_array'][] = 'with-navigation';
   }
-  if (!empty($vars['secondary_menu'])) {
-    $vars['classes_array'][] = 'with-subnav';
+  if (!empty($variables['secondary_menu'])) {
+    $variables['classes_array'][] = 'with-subnav';
   }
 
   // Add first/last classes to node listings about to be rendered.
-  if (isset($vars['page']['content']['system_main']['nodes'])) {
+  if (isset($variables['page']['content']['system_main']['nodes'])) {
     // All nids about to be loaded (without the #sorted attribute).
-    $nids = element_children($vars['page']['content']['system_main']['nodes']);
+    $nids = element_children($variables['page']['content']['system_main']['nodes']);
     // Only add first/last classes if there is more than 1 node being rendered.
     if (count($nids) > 1) {
       $first_nid = reset($nids);
       $last_nid = end($nids);
-      $first_node = $vars['page']['content']['system_main']['nodes'][$first_nid]['#node'];
+      $first_node = $variables['page']['content']['system_main']['nodes'][$first_nid]['#node'];
       $first_node->classes_array = array('first');
-      $last_node = $vars['page']['content']['system_main']['nodes'][$last_nid]['#node'];
+      $last_node = $variables['page']['content']['system_main']['nodes'][$last_nid]['#node'];
       $last_node->classes_array = array('last');
     }
   }
 
   // Allow page override template suggestions based on node content type.
-  if (isset($vars['node']->type) && isset($vars['node']->nid)) {
-    $vars['theme_hook_suggestions'][] = 'page__' . $vars['node']->type;
-    $vars['theme_hook_suggestions'][] = "page__node__" . $vars['node']->nid;
+  if (isset($variables['node']->type) && isset($variables['node']->nid)) {
+    $variables['theme_hook_suggestions'][] = 'page__' . $variables['node']->type;
+    $variables['theme_hook_suggestions'][] = "page__node__" . $variables['node']->nid;
   }
-}
-
-function basic_preprocess_node(&$vars) {
-  // Add a striping class.
-  $vars['classes_array'][] = 'node-' . $vars['zebra'];
-
-  // Add $unpublished variable.
-  $vars['unpublished'] = (!$vars['status']) ? TRUE : FALSE;
-
-  // Merge first/last class (from basic_preprocess_page) into classes array of current node object.
-  $node = $vars['node'];
-  if (!empty($node->classes_array)) {
-    $vars['classes_array'] = array_merge($vars['classes_array'], $node->classes_array);
-  }
-}
-
-function basic_preprocess_block(&$vars, $hook) {
-  // Add a striping class.
-  $vars['classes_array'][] = 'block-' . $vars['block_zebra'];
-
-  // Add first/last block classes
-  $first_last = "";
-  // If block id (count) is 1, it's first in region.
-  if ($vars['block_id'] == '1') {
-    $first_last = "first";
-    $vars['classes_array'][] = $first_last;
-  }
-  // Count amount of blocks about to be rendered in that region.
-  $block_count = count(block_list($vars['elements']['#block']->region));
-  if ($vars['block_id'] == $block_count) {
-    $first_last = "last";
-    $vars['classes_array'][] = $first_last;
-  }
-
-  // Simple Classes.
-  $vars['classes_array'] = array('block');
 }
 
 /**
- * Return a themed breadcrumb trail.
- *
- * @param $breadcrumb
- *   An array containing the breadcrumb links.
- * @return
- *   A string containing the breadcrumb output.
+ * Implements hook_preprocess_node().
+ */
+function basic_preprocess_node(&$variables) {
+  // Add a striping class.
+  $variables['classes_array'][] = 'node-' . $variables['zebra'];
+
+  // Add $unpublished variable.
+  $variables['unpublished'] = (!$variables['status']) ? TRUE : FALSE;
+
+  // Merge first/last class (from basic_preprocess_page) into classes array of
+  // current node object.
+  $node = $variables['node'];
+  if (!empty($node->classes_array)) {
+    $variables['classes_array'] = array_merge($variables['classes_array'], $node->classes_array);
+  }
+}
+
+/**
+ * Implements hook_preprocess_block().
+ */
+function basic_preprocess_block(&$variables) {
+  // Add a zebra striping class.
+  $variables['classes_array'][] = 'block-' . $variables['block_zebra'];
+
+  // Add first/last block classes.
+  // If block id (count) is 1, it's first in region.
+  if ($variables['block_id'] == '1') {
+    $variables['classes_array'][] = 'first';
+  }
+  // Count amount of blocks about to be rendered in the same region.
+  $block_count = count(block_list($variables['elements']['#block']->region));
+  if ($variables['block_id'] == $block_count) {
+    $variables['classes_array'][] = 'last';
+  }
+
+  // Add simple classes.
+  $variables['classes_array'][] = 'block';
+}
+
+/**
+ * Implements theme_breadcrumb().
  */
 function basic_breadcrumb($variables) {
   $breadcrumb = $variables['breadcrumb'];
@@ -206,7 +217,8 @@ function basic_breadcrumb($variables) {
       }
 
       // Provide a navigational heading to give context for breadcrumb links to
-      // screen-reader users. Make the heading invisible with .element-invisible.
+      // screen-reader users. Make the heading invisible with
+      // .element-invisible.
       $heading = '<h2 class="element-invisible">' . t('You are here') . '</h2>';
 
       return $heading . '<div class="breadcrumb">' . implode($breadcrumb_separator, $breadcrumb) . $trailing_separator . $title . '</div>';
@@ -219,40 +231,33 @@ function basic_breadcrumb($variables) {
 /**
  * Converts a string to a suitable html ID attribute.
  *
- * http://www.w3.org/TR/html4/struct/global.html#h-7.5.2 specifies what makes a
+ * Http://www.w3.org/TR/html4/struct/global.html#h-7.5.2 specifies what makes a
  * valid ID attribute in HTML. This function:
  *
  * - Ensure an ID starts with an alpha character by optionally adding an 'n'.
  * - Replaces any character except A-Z, numbers, and underscores with dashes.
  * - Converts entire string to lowercase.
  *
- * @param $string
- *  The string
- * @return
- *  The converted string
+ * @param string $string
+ *   The string.
+ *
+ * @return string
+ *   The converted string.
  */
 function basic_id_safe($string) {
-  // Replace with dashes anything that isn't A-Z, numbers, dashes, or underscores.
+  // Replace with dashes anything that isn't A-Z, numbers, dashes, or
+  // underscores.
   $string = strtolower(preg_replace('/[^a-zA-Z0-9_-]+/', '-', $string));
   // If the first character is not a-z, add 'n' in front.
-  if (!ctype_lower($string{0})) { // Don't use ctype_alpha since its locale aware.
-    $string = 'id'. $string;
+  // Don't use ctype_alpha since its locale aware.
+  if (!ctype_lower($string{0})) {
+    $string = 'id' . $string;
   }
   return $string;
 }
 
 /**
- * Generate the HTML output for a menu link and submenu.
- *
- * @param $variables
- *  An associative array containing:
- *   - element: Structured array data for a menu link.
- *
- * @return
- *  A themed HTML string.
- *
- * @ingroup themeable
- *
+ * Implements theme_menu_link().
  */
 function basic_menu_link(array $variables) {
   $element = $variables['element'];
@@ -272,7 +277,7 @@ function basic_menu_link(array $variables) {
 }
 
 /**
- * Override or insert variables into theme_menu_local_task().
+ * Implements hook_preprocess_menu_local_task().
  */
 function basic_preprocess_menu_local_task(&$variables) {
   $link =& $variables['element']['#link'];
@@ -287,6 +292,8 @@ function basic_preprocess_menu_local_task(&$variables) {
 }
 
 /**
+ * Implements theme_menu_local_tasks().
+ *
  * Duplicate of theme_menu_local_tasks() but adds clearfix to tabs.
  */
 function basic_menu_local_tasks(&$variables) {
@@ -304,5 +311,6 @@ function basic_menu_local_tasks(&$variables) {
     $variables['secondary']['#suffix'] = '</ul>';
     $output .= drupal_render($variables['secondary']);
   }
+
   return $output;
 }

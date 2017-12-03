@@ -156,10 +156,9 @@ The basic operation for Module Builder is as in this example:
 
     // Load the file for the factory class.
     // (Not necessary if using MB via Composer.)
-    include_once('ModuleBuilderFactory.php');
-    // Tell MB which environment it's being used in. The Drupal core version is
-    // detected automatically.
-    \ModuleBuilder\Factory::setEnvironmentClass('Drush');
+    include_once('Factory.php');
+    // Tell MB which environment it's being used in and the Drupal core version.
+    \ModuleBuilder\Factory::setEnvironmentClass('Drush', 8);
     // Get the Task handler.
     $mb_task_handler_report = \ModuleBuilder\Factory::getTask('ReportHookData');
     // Call a method in the Task handler to perform the operation.
@@ -169,7 +168,7 @@ The code generation system is made up of a set of Generator classes, and is
 operated from the \ModuleBuilder\Task\Generate class. To build code, you need
 to specify:
   - the root generator to use, such as 'module', 'theme', 'profile'. This is
-    the name of a subclass of ModuleBuider\Generator\RootComponent.
+    the name of a subclass of ModuleBuilder\Generator\RootComponent.
   - an array of component data. The options for this depend on the component.
 
  This is done as follows:

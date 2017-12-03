@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\Collect.
+ * Contains ModuleBuilder\Task\Collect.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for collecting and processing definitions for Drupal components.
@@ -21,7 +21,7 @@ class Collect extends Base {
   /**
    * The sanity level this task requires to operate.
    */
-  protected $sanity_level = 'hook_directory';
+  protected $sanity_level = 'data_directory_exists';
 
   /**
    * Collect data about Drupal components from the current site's codebase.
@@ -79,8 +79,6 @@ class Collect extends Base {
 
   /**
    * Builds complete hook data array from downloaded files and stores in a file.
-   *
-   * (Replaces module_builder_process_hook_data().)
    *
    * @param hook_file_data
    *  An array of data about the files to process, keyed by (safe) filename:
@@ -146,7 +144,7 @@ class Collect extends Base {
       $group = $file_data['group'];
 
       // Get info about hooks from Drupal.
-      $hook_info = $this->getHookInfo($file_data);
+      $hook_info = $this->getDrupalHookInfo($file_data);
 
       // Create an array in the form of:
       // array(
@@ -289,7 +287,7 @@ class Collect extends Base {
   }
 
   /**
-   * Get info about hooks from Drupal.
+   * Get info about hooks from Drupal Core.
    *
    * This invokes hook_hook_info().
    *
@@ -300,7 +298,7 @@ class Collect extends Base {
    *  The data from the implementation of hook_hook_info() for the module that
    *  provided the documentation file.
    */
-  protected function getHookInfo($file_data) {
+  protected function getDrupalHookInfo($file_data) {
     // Note that the 'module' key is flaky: some modules use a different name
     // for their api.php file.
     $module = $file_data['module'];
@@ -310,6 +308,35 @@ class Collect extends Base {
     }
 
     return $hook_info;
+  }
+
+  /**
+   * Get hook information declared by Module Builder.
+   *
+   * This invokes our own hook, hook_module_builder_info(), as well as adding
+   * hardcoded info such as module file locations, which can't be deduced from
+   * either api.php files or hook_hook_info().
+   */
+  protected function getHookInfo() {
+    // Get data by invoking our hook.
+    $data = \ModuleBuilder\Factory::getEnvironment()->invokeInfoHook();
+
+    // Add our data.
+    $result = $this->getAdditionalHookInfo();
+    $data = array_merge($data, $result);
+
+    return $data;
+  }
+
+  /**
+   * Declare our own info to add to data from our info hook.
+   *
+   * We're not necessarily running as a Drupal module, so we declare the data
+   * we want to add here.
+   */
+  protected function getAdditionalHookInfo() {
+    // Subclasses should override this.
+    return array();
   }
 
 }

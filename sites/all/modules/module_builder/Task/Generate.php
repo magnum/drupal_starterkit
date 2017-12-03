@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\Generate.
+ * Contains ModuleBuilder\Task\Generate.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for generating a component.
@@ -30,6 +30,14 @@ class Generate extends Base {
   private $root_generator;
 
   /**
+   * The list of components.
+   *
+   * This is keyed by the name of the component name. Values are the
+   * instantiated component generators.
+   */
+  protected $component_list;
+
+  /**
    * Override the base constructor.
    *
    * @param $environment
@@ -40,8 +48,6 @@ class Generate extends Base {
    */
   public function __construct($environment, $component_type) {
     $this->environment = $environment;
-
-    $this->initGenerators();
 
     // The component name is just the same as the type for the base generator.
     $component_name = $component_type;
@@ -65,20 +71,12 @@ class Generate extends Base {
   }
 
   /**
-   * Helper to perform setup tasks: register autoloader.
-   */
-  private function initGenerators() {
-    // Register our autoload handler for generator classes.
-    spl_autoload_register(array($this, 'generatorAutoload'));
-  }
-
-  /**
    * Get the root generator.
    *
    * This may be used by UIs that want to provide interactive building up of
    * component parameters.
    *
-   * @see ModuleBuider\Generator\BaseGenerator::getComponentDataDefaultValue().
+   * @see ModuleBuilder\Generator\BaseGenerator::getComponentDataDefaultValue().
    */
   public function getRootGenerator() {
     return $this->root_generator;
@@ -107,7 +105,7 @@ class Generate extends Base {
    *    'string' or 'array'.
    *  - 'required': Boolean indicating whether this property must be provided.
    * For the full documentation for all properties, see
-   * ModuleBuider\Generator\RootComponent\componentDataDefinition().
+   * ModuleBuilder\Generator\RootComponent\componentDataDefinition().
    */
   public function getRootComponentDataInfo() {
     return $this->root_generator->getComponentDataInfo();
@@ -167,8 +165,8 @@ class Generate extends Base {
    * @param $component_data
    *  An associative array of data for the component. Values depend on the
    *  component class. For details, see the constructor of the generator, of the
-   *  form ModuleBuider\Generator\COMPONENT, e.g.
-   *  ModuleBuider\Generator\Module::__construct().
+   *  form ModuleBuilder\Generator\COMPONENT, e.g.
+   *  ModuleBuilder\Generator\Module::__construct().
    *
    * @return
    *  A files array whose keys are filepaths (relative to the module folder) and
@@ -194,31 +192,178 @@ class Generate extends Base {
     // Set the root generator on ourselves now we actually have it.
     $this->root_generator = $root_generator;
 
-    // Recursively get subcomponents.
-    $this->root_generator->assembleComponentList();
+    // Recursively assemble all the components that are needed.
+    $this->component_list = $this->root_generator->assembleComponentList();
+    \ModuleBuilder\Factory::getEnvironment()->log(array_keys($this->component_list), "Complete component list names");
 
     // Now assemble them into a tree.
-    $this->root_generator->assembleComponentTree();
+    // Calls containingComponent() on everything and puts it into a 2-D array
+    // of parent => [children].
+    $tree = $this->assembleComponentTree($this->component_list);
+    \ModuleBuilder\Factory::getEnvironment()->log($tree, "Component tree");
 
-    // Let each component that is a parent in the tree collect data from its
-    // child components.
-    $this->root_generator->assembleContainedComponents();
+    // Let each file component in the tree gather data from its own children.
+    $this->collectFileContents($this->component_list, $tree);
 
     //drush_print_r($generator->components);
 
     // Build files.
-    // First we recurse into the tree to collect data on the files needed. Each
-    // component gets to add to the files array.
-    $files = array();
-    $this->root_generator->collectFiles($files);
-    //drush_print_r($files);
+    // Get info on files. All components that wish to provide a file should have
+    // registered themselves as first-level children of the root component.
+    $files = $this->collectFiles($this->component_list, $tree);
+
+    // Allow all components to alter all the collected files.
+    $this->filesAlter($files, $this->component_list);
 
     // Then we assemble the files into a simple array of full filename and
     // contents.
-    // TODO: rename this to buildFiles().
-    $files_assembled = $this->root_generator->assembleFiles($files);
+    $files_assembled = $this->assembleFiles($files);
 
     return $files_assembled;
+  }
+
+  /**
+   * Assemble a tree of components, grouped by what they contain.
+   *
+   * For example, a code file contains its functions; a form component
+   * contains the handler functions.
+   *
+   * This iterates over the flat list of components assembled by
+   * assembleComponentList(), and re-assembles it as a tree.
+   *
+   * The tree is an array of parentage data, where keys are the names of
+   * components that are parents, and values are flat arrays of component names.
+   * The top level of the tree is the root component, whose name is its type,
+   * e.g. 'module'.
+   * To traverse the tree:
+   *  - access the base component name
+   *  - iterate over its children
+   *  - recursively do the same thing to each child component.
+   *
+   * Not all components in the component list need to place themselves into the
+   * tree, but this means that they will not participate in file assembly.
+   *
+   * @param $components
+   *  The list of components, as assembled by assembleComponentList().
+   *
+   * @return
+   *  A tree of parentage data for components, as an array keyed by the parent
+   *  component name, where each value is an array of the names of the child
+   *  components. So for example, the list of children of component 'foo' is
+   *  given by $tree['foo'].
+   */
+  public function assembleComponentTree($components) {
+    $tree = array();
+    foreach ($components as $name => $component) {
+      $parent_name = $component->containingComponent();
+      if (!empty($parent_name)) {
+        $tree[$parent_name][] = $name;
+      }
+    }
+
+    return $tree;
+  }
+
+  /**
+   * Allow file components to gather data from their child components.
+   *
+   * @param $components
+   *  The array of components.
+   * @param $tree
+   *  The tree array.
+   */
+  protected function collectFileContents($components, $tree) {
+    // Iterate over all file-providing components, i.e. one level below the root
+    // of the tree.
+    $root_component_name = $this->root_generator->name;
+    foreach ($tree[$root_component_name] as $file_component_name) {
+      // Skip files with no children in the tree.
+      if (empty($tree[$file_component_name])) {
+        continue;
+      }
+
+      // Let the file component run over its children iteratively.
+      // (Not literally ;)
+      $components[$file_component_name]->buildComponentContentsIterative($components, $tree);
+    }
+  }
+
+  /**
+   * Allow components to alter the files prior to output.
+   *
+   * @param $files
+   *  The array of file info, passed by reference.
+   * @param $component_list
+   *  The component list.
+   */
+  protected function filesAlter(&$files, $component_list) {
+    foreach ($component_list as $name => $component) {
+      $component->filesAlter($files, $component_list);
+    }
+  }
+
+  /**
+   * Collect file data from components.
+   *
+   * @param $component_list
+   *  The component list.
+   * @param $tree
+   *  An array of parentage data about components, as given by
+   *  assembleComponentTree().
+   *
+   * @return
+   *  An array of file info, keyed by arbitrary file ID.
+   */
+  protected function collectFiles($component_list, $tree) {
+    $file_info = array();
+
+    // Components which provide a file should have registered themselves as
+    // children of the root component.
+    $root_component_name = $this->root_generator->name;
+    foreach ($tree[$root_component_name] as $child_component_name) {
+      $child_component = $component_list[$child_component_name];
+      $child_component_file_data = $child_component->getFileInfo();
+      if (is_array($child_component_file_data)) {
+        $file_info += $child_component_file_data;
+      }
+    }
+
+    return $file_info;
+  }
+
+  /**
+   * Assemble file info into filename and code.
+   *
+   * @param $files
+   *  An array of file info, as compiled by collectFiles().
+   *
+   * @return
+   *  An array of files ready for output. Keys are the filepath and filename
+   *  relative to the module folder (eg, 'foo.module', 'tests/module.test');
+   *  values are strings of the contents for each file.
+   */
+  function assembleFiles($files) {
+    $return = array();
+
+    foreach ($files as $file_id => $file_info) {
+      if (!empty($file_info['path'])) {
+        $filepath = $file_info['path'] . '/' . $file_info['filename'];
+      }
+      else {
+        $filepath = $file_info['filename'];
+      }
+
+      $code = implode($file_info['join_string'], $file_info['body']);
+
+      // Replace tokens in file contents and file path.
+      $variables = $this->root_generator->getReplacements();
+      $code = strtr($code, $variables);
+      $filepath = strtr($filepath, $variables);
+
+      $return[$filepath] = $code;
+    }
+
+    return $return;
   }
 
   /**
@@ -239,7 +384,7 @@ class Generate extends Base {
    *   A generator object, with the component name and data set on it, as well
    *   as a reference to this task handler.
    *
-   * @throws \ModuleBuilder\Exception
+   * @throws \ModuleBuilder\Exception\InvalidInputException
    *   Throws an exception if the given component type does not correspond to
    *   a component class.
    */
@@ -247,15 +392,12 @@ class Generate extends Base {
     $class = $this->getGeneratorClass($component_type);
 
     if (!class_exists($class)) {
-      throw new \ModuleBuilder\Exception("Invalid component type $component_type.");
+      throw new \ModuleBuilder\Exception\InvalidInputException(strtr("Invalid component type !type.", array(
+        '!type' => htmlspecialchars($component_type, ENT_QUOTES, 'UTF-8'),
+      )));
     }
 
-    $generator = new $class($component_name, $component_data);
-
-    // Each generator needs a link back to the factory to be able to make more
-    // generators, and also so it can access the environment.
-    $generator->task = $this;
-    $generator->base_component = $this->root_generator;
+    $generator = new $class($component_name, $component_data, $this, $this->root_generator);
 
     return $generator;
   }
@@ -264,47 +406,24 @@ class Generate extends Base {
    * Helper function to get the desired Generator class.
    *
    * @param $type
-   *  The type of the component. This is used to determine the class.
+   *  The type of the component. This is the name of the class, without the
+   *  version suffix. For classes in camel case, the string given here may be
+   *  all in lower case.
    *
    * @return
    *  A fully qualified class name for the type and, if it exists, version, e.g.
-   *  'ModuleBuider\Generator\Info6'.
-   *
-   * @see Generate::generatorAutoload()
+   *  'ModuleBuilder\Generator\Info6'.
    */
   public function getGeneratorClass($type) {
-    // Include our general include files, which contains base and parent classes.
-    $file_path = $this->environment->getPath("Generator/Base.php");
-    include_once($file_path);
-
     $type     = ucfirst($type);
     $version  = $this->environment->getCoreMajorVersion();
-    $class    = 'ModuleBuider\\Generator\\' . $type . $version;
-
-    // Trigger the autoload for the base name without the version, as all versions
-    // are in the same file.
-    class_exists('ModuleBuider\\Generator\\' . $type);
+    $class    = 'ModuleBuilder\\Generator\\' . $type . $version;
 
     // If there is no version-specific class, use the base class.
     if (!class_exists($class)) {
-      $class  = 'ModuleBuider\\Generator\\' . $type;
+      $class  = 'ModuleBuilder\\Generator\\' . $type;
     }
     return $class;
-  }
-
-  /**
-   * Autoload handler for generator classes.
-   *
-   * @see getGeneratorClass()
-   */
-  function generatorAutoload($class) {
-    // Generator classes are in standardly named files, with all versions in the
-    // same file.
-    list($module_builder, $generator, $class) = explode('\\', $class);
-    $file_path = $this->environment->getPath("Generator/$class.php");
-    if (file_exists($file_path)) {
-      include_once($file_path);
-    }
   }
 
 }

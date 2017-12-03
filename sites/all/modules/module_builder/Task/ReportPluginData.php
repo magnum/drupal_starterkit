@@ -2,13 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\ReportPluginData.
+ * Contains ModuleBuilder\Task\ReportPluginData.
  */
 
-namespace ModuleBuider\Task;
-
-// We have no autoloading for Tasks.
-include_once(dirname(__FILE__) . "/ReportHookDataFolder.php");
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for reporting on hook data.
@@ -21,7 +18,7 @@ class ReportPluginData extends ReportHookDataFolder {
   /**
    * The sanity level this task requires to operate.
    */
-  protected $sanity_level = 'hook_data';
+  protected $sanity_level = 'component_data_processed';
 
   /**
    * Get the list of plugin data.

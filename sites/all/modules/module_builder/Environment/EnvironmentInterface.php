@@ -15,20 +15,20 @@ interface EnvironmentInterface {
   /**
    * Sanity check our basic environment to a specified level.
    *
-   * This is called by the factory when a Task is requested from it.
+   * This is called by ModuleBuilder\Factory when a Task is requested from it.
    *
-   * If the property $skipSanity is set on this environment object, the tests
-   * are skipped. This should only be used in rare circumstances (such as drush
-   * autocomplete).
+   * The tests can be skipped by first calling skipSanityCheck(). This should
+   * only be used in rare circumstances (such as drush autocomplete).
    *
    * @param $sanity_level
    *  The level up to which to verify sanity. The successive levels are:
    *    - 'none': No checks required.
-   *    - 'hook_directory': The hooks directory exists (or can be created) and
-   *      is writable.
-   *    - 'hook_data': The hook data files are present in the hooks directory.
+   *    - 'data_directory_exists': The hooks directory exists (or can be
+   *      created) and is writable.
+   *    - 'component_data_processed': The hook data files are present in the
+   *      hooks directory.
    *
-   * @throws \ModuleBuilder\Exception
+   * @throws \ModuleBuilder\Exception\SanityException
    *  Throws an exception if the environment is not ready at the specified
    *  level. It's up to the caller to provide meaningful feedback to the user.
    */
@@ -36,6 +36,12 @@ interface EnvironmentInterface {
 
   /**
    * Set the environment to skip sanity checks until further notice.
+   *
+   * This may be set on the environment after it has been initialized. Example:
+   * @code
+   * \ModuleBuilder\Factory::setEnvironmentClass('Drush', 8);
+   * \ModuleBuilder\Factory::getEnvironment()->skipSanityCheck(TRUE);
+   * @endcode
    *
    * @param bool $setting
    *  Set to TRUE to set the environment to skip sanity checks; FALSE to restore
@@ -139,7 +145,16 @@ interface EnvironmentInterface {
    * Get a user preference setting.
    *
    * @param $name
-   *   The name of the variable to return.
+   *   The name of the setting to return. Because we can be in a variety of
+   *   environments and versions, we have our own names for our settings, which
+   *   version helper classes may convert to something else. The following
+   *   are recognized, but settings marked 'optional' need not be supported by
+   *   an environment:
+   *    - 'data_directory': The location of our stored documentation and
+   *      processed data files.
+   *    - 'detail_level': (optional) The amount of detail to add to generated
+   *      code. 0 for normal level, 1 for additional detail.
+   *    - 'footer': (optional) Text to add to the end of every module code file.
    * @param $default
    *   The default value to use if this variable has never been set.
    *
@@ -147,5 +162,18 @@ interface EnvironmentInterface {
    *   The value of the variable. Unserialization is taken care of as necessary.
    */
   public function getSetting($name, $default = NULL);
+
+  /**
+   * Get the path to a Drupal extension, e.g. a module or theme.
+   *
+   * @param $type
+   *  The type. One of 'module' or 'theme'.
+   * @param $name
+   *  The name of the extension.
+   *
+   * @return
+   *  The path to the extension, or NULL if it is not present and active.
+   */
+  public function getExtensionPath($type, $name);
 
 }

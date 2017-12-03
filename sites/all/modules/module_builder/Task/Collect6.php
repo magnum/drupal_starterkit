@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\Collect6.
+ * Contains ModuleBuilder\Task\Collect6.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for collecting and processing hook definitions.
@@ -25,12 +25,6 @@ class Collect6 extends Collect {
     $hook_files = $this->getHookFileUrls($directory);
     //print_r($hook_files);
 
-    // For testing only: skip downloading, just process.
-    /*
-    module_builder_process_hook_data($hook_files);
-    return $hook_files;
-    */
-
     // Retrieve each file and store it in the hooks directory, overwriting what's currently there
     foreach ($hook_files as $file_name => $data) {
       $file_contents = drupal_http_request($data['url']);
@@ -39,9 +33,6 @@ class Collect6 extends Collect {
       //_module_builder_drush_print("writing $directory/$file_name", 2);
       file_put_contents("$directory/$file_name", $destination . $file_contents->data);
     }
-
-    // inform that hook documentation has been downloaded.
-    drupal_set_message(t("Module Builder has just downloaded hook documentation to your %dir directory from CVS. This documentation contains detailed descriptions and usage examples of each of Drupal's hooks. Please view the files for more information, or view them online at the <a href=\"!api\">Drupal API documentation</a> site.", array('%dir' => 'files/'. variable_get('module_builder_hooks_directory', 'hooks'), '!api' => url('http://api.drupal.org/'))));
 
     return $hook_files;
   }
@@ -61,8 +52,8 @@ class Collect6 extends Collect {
         [group] => core
    */
   function getHookFileUrls($directory) {
-    // Get data by invoking our hook.
-    $data = \ModuleBuilder\Factory::getEnvironment()->invokeInfoHook();
+    // Get our data.
+    $data = $this->getHookInfo();
 
     foreach ($data as $module => $module_data) {
       $branch = $module_data['branch'];
@@ -95,6 +86,113 @@ class Collect6 extends Collect {
     //print_r($urls);
 
     return $urls;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getAdditionalHookInfo() {
+    $info = array(
+      // Hooks on behalf of Drupal core.
+      'system' => array(
+        'url' => 'http://drupalcode.org/project/documentation.git/blob_plain/refs/heads/%branch:/developer/hooks/%file',
+        'branch' => '6.x-1.x',
+        'group' => '#filenames',
+        'hook_files' => array(
+          // List of files we should slurp from the url for hook defs.
+          // and the destination file for processed code.
+          'core.php' =>    '%module.module',
+          'node.php' =>    '%module.module',
+          'install.php' => '%module.install',
+        ),
+      ),
+      // We need to do our own stuff now we have a hook!
+      'module_builder' => array(
+        'url' => 'http://drupalcode.org/project/module_builder.git/blob_plain/refs/heads/%branch:/hooks/%file',
+        'branch' => '6.x-2.x',
+        'group' => 'module builder',
+        'hook_files' => array(
+          'module_builder.php' => '%module.module_builder.inc',
+        ),
+      ),
+
+      // Support for some contrib modules (the ones I use ;) -- for more please
+      // file a patch either here or with the module in question.
+      // Views
+      'views' => array(
+        'url' => 'http://drupalcode.org/project/views.git/blob_plain/refs/heads/%branch:/docs/%file',
+        'branch' => '6.x-2.x',
+        'group' => 'views',
+        'hook_files' => array(
+          'docs.php' => '%module.module',
+          // other files here: view.inc, views.default.inc
+        ),
+        // hooks that go in files other than %module.module
+        'hook_destinations' => array(
+          '%module.views.inc' => array(
+            'hook_views_data',
+            'hook_views_data_alter',
+            'hook_views_admin_links_alter',
+            'hook_views_handlers',
+            'hook_views_plugins',
+            'hook_views_preview_info_alter',
+            'hook_views_query_alter',
+          ),
+          '%module.views_convert.inc' => array(
+            'hook_views_convert',
+          ),
+          '%module.views_default.inc' => array(
+            'hook_views_default_views',
+          ),
+        ),
+      ),
+      // Ubercart
+      'ubercart' => array(
+        'url' => 'http://drupalcode.org/project/ubercart.git/blob_plain/refs/heads/%branch:/docs/%file',
+        'branch' => '6.x-2.x',
+        'group' => 'ubercart',
+        'hook_files' => array(
+          'hooks.php' => '%module.module',
+        ),
+      ),
+      // Signup
+      'signup' => array(
+        'url' => 'http://drupalcode.org/project/signup.git/blob_plain/refs/heads/%branch:/%file',
+        'branch' => '6.x-2.x',
+        'group' => 'signup',
+        'hook_files' => array(
+          'signup.api.php' => '%module.module',
+        ),
+      ),
+      // Ctools
+      'ctools' => array(
+        'url' => 'http://drupalcode.org/project/ctools.git/blob_plain/refs/heads/%branch:/%file',
+        'branch' => '6.x-1.x',
+        'group' => 'ctools',
+        'hook_files' => array(
+          'ctools.api.php' => '%module.module',
+        ),
+      ),
+      // Webform
+      'webform' => array(
+        'url' => 'http://drupalcode.org/project/webform.git/blob_plain/refs/heads/%branch:/%file',
+        'branch' => '6.x-3.x',
+        'group' => 'webform',
+        'hook_files' => array(
+          'webform_hooks.php' => '%module.module',
+        ),
+      ),
+      // Payment API
+      'pay' => array(
+        'url' => 'http://drupalcode.org/project/pay.git/blob_plain/refs/heads/%branch:/%file',
+        'branch' => '6.x-1.x',
+        'group' => 'pay',
+        'hook_files' => array(
+          'pay.api.php' => '%module.module',
+        ),
+      ),
+    );
+    return $info;
   }
 
 }

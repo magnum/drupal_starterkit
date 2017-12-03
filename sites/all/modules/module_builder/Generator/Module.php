@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\Module.
+ * Contains ModuleBuilder\Generator\Module.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Component generator: module.
@@ -37,7 +37,7 @@ class Module extends RootComponent {
   /**
    * The sanity level this generator requires to operate.
    */
-  public $sanity_level = 'hook_data';
+  public $sanity_level = 'component_data_processed';
 
   /**
    * The data for the component.
@@ -88,12 +88,9 @@ class Module extends RootComponent {
    *      to any that are added automatically). This should in the same form
    *      as the return from requiredComponents(), thus keyed by component name,
    *      with values either a component type or an array of data.
-   *  Properties added by generators during the process:
-   *    - 'hook_file_data': Added by the Hooks generator. Keyed by the component
-   *      names of the ModuleCodeFile type components that Hooks adds.
    */
-  function __construct($component_name, $component_data = array()) {
-    parent::__construct($component_name, $component_data);
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
   }
 
   /**
@@ -124,29 +121,41 @@ class Module extends RootComponent {
         'required' => FALSE,
       ),
       'module_dependencies' => array(
-        'label' => 'Module dependencies (space separated list)',
-        'default' => NULL,
+        'label' => 'Module dependencies',
+        'description' => 'The machine names of the modules this module should have as dependencies.',
+        'default' => array(),
         'required' => FALSE,
+        'format' => 'array',
       ),
       // If this is given, then hook_help() is automatically added to the list
       // of required hooks.
       'module_help_text' => array(
-        'label' => 'Module help text (adds hook_help())',
+        'label' => 'Module help text',
+        'description' => 'The text to show on the site help page. This automatically adds hook_help().',
         'default' => NULL,
         'required' => FALSE,
       ),
       // This adds permissions, so needs to be before permissions.
       'settings_form' => array(
         'label' => "Admin settings form",
+        'description' => "A form for setting the module's general settings. Also produces a permission and a router item.",
         'required' => FALSE,
         'format' => 'boolean',
         'component' => 'AdminSettingsForm',
       ),
-      'permissions' => array(
-        'label' => "Permissions",
+      'services' => array(
+        'label' => "Services",
+        'description' => 'A list of machine names of services for this module to provide.',
         'required' => FALSE,
         'format' => 'array',
-        'component' => 'Permissions',
+        'component' => 'Service',
+      ),
+      'permissions' => array(
+        'label' => "Permissions",
+        'description' => 'A list of machine names of permissions for this module to provide.',
+        'required' => FALSE,
+        'format' => 'array',
+        'component' => 'Permission',
       ),
       'module_hook_presets' => array(
         'label' => 'Hook preset groups',
@@ -175,18 +184,22 @@ class Module extends RootComponent {
 
           foreach ($value as $given_preset_name) {
             if (!isset($hook_presets[$given_preset_name])) {
-              throw new \ModuleBuilder\Exception("Undefined hook preset group $given_preset_name.");
+              throw new \ModuleBuilder\Exception\InvalidInputException(strtr("Undefined hook preset group !name", array(
+                '!name' => htmlspecialchars($given_preset_name, ENT_QUOTES, 'UTF-8'),
+              )));
             }
             // DX: check the preset is properly defined.
             if (!is_array($hook_presets[$given_preset_name]['hooks'])) {
-              throw new \ModuleBuilder\Exception("Incorrectly defined hook preset group $given_preset_name.");
+              throw new \ModuleBuilder\Exception\InvalidInputException(strtr("Incorrectly defined hook preset group !name", array(
+                '!name' => htmlspecialchars($given_preset_name, ENT_QUOTES, 'UTF-8'),
+              )));
             }
 
             // Add the preset hooks list to the hooks array in the component
-            // data.
+            // data. The 'hooks' property processing will handle them.
             $hooks = $hook_presets[$given_preset_name]['hooks'];
             $component_data['hooks'] = array_merge($component_data['hooks'], $hooks);
-            drush_print_r($component_data['hooks']);
+            //drush_print_r($component_data['hooks']);
           }
         },
       ),
@@ -198,6 +211,13 @@ class Module extends RootComponent {
           $mb_task_handler_report_hooks = \ModuleBuilder\Factory::getTask('ReportHookData');
 
           $hook_options = $mb_task_handler_report_hooks->listHookNamesOptions();
+
+          return $hook_options;
+        },
+        'options_structured' => function(&$property_info) {
+          $mb_task_handler_report_hooks = \ModuleBuilder\Factory::getTask('ReportHookData');
+
+          $hook_options = $mb_task_handler_report_hooks->listHookOptionsStructured();
 
           return $hook_options;
         },
@@ -223,7 +243,13 @@ class Module extends RootComponent {
             }
           }
 
-          $component_data['hooks'] = $hooks;
+          // Filter out empty values, in case Drupal UI forms haven't done so.
+          $hooks = array_filter($hooks);
+
+          $component_data['requested_components']['hooks'] = array(
+            'component_type' => 'Hooks',
+            'hooks' => $hooks,
+          );
         }
       ),
       'plugins' => array(
@@ -243,7 +269,8 @@ class Module extends RootComponent {
         'component' => 'Plugin',
       ),
       'router_items' => array(
-        'label' => "required router paths, eg 'path/foo'",
+        'label' => "Router paths",
+        'description' => "Router paths, eg 'path/foo'",
         'required' => FALSE,
         'format' => 'array',
         // This tells the system that this is a request for generator
@@ -251,13 +278,35 @@ class Module extends RootComponent {
         // the module data.
         'component' => 'RouterItem',
       ),
+      'api' => array(
+        'label' => "api.php file",
+        'description' => 'An api.php file documents hooks and callbacks that this module invents.',
+        'required' => FALSE,
+        'default' => FALSE,
+        'format' => 'boolean',
+        'component' => 'API',
+      ),
+      'readme' => array(
+        'label' => "README file",
+        'required' => FALSE,
+        'default' => TRUE,
+        'format' => 'boolean',
+        'component' => 'Readme',
+      ),
+      'tests' => array(
+        'label' => "Simpletest test case class",
+        'required' => FALSE,
+        'default' => FALSE,
+        'format' => 'boolean',
+        'component' => 'Tests',
+      ),
 
       // The following defaults are for ease of developing.
       // Uncomment them to reduce the amount of typing needed for testing.
       //'hooks' => 'init',
       //'router_items' => 'path/foo path/bar',
       // The following properties shouldn't be offered as UI options.
-      'module_camel_case_name' =>  array(
+      'camel_case_name' =>  array(
         // Indicates that this does not need to be obtained from the user, as it
         // is computed from other properties.
         'computed' => TRUE,
@@ -323,15 +372,15 @@ class Module extends RootComponent {
     // Start by defining the subcomponents we know how to handle.
     // Keys are names, values are types (to be used to build class names).
     $components = array(
-      'hooks' => 'hooks',
       // Component type case must match the filename for case-sensitive
       // filesystems (i.e. not OS X).
-      'api' => 'API',
-      'readme' => 'readme',
-      'tests' => 'tests',
-      // Info must go last, as it needs to know what files are being generated.
       'info' => 'info',
     );
+
+    // Case 0: nothing was requested, so it means everything.
+    if (!isset($module_data['requested_build'])) {
+      return $components;
+    }
 
     // Create a build list.
     // Take the keys, as all values are set to TRUE, and standardize to lower
@@ -364,7 +413,7 @@ class Module extends RootComponent {
     //drush_print_r($build_list);
 
     // Get the components that were requested.
-    $intersection_components = array_intersect($component_list, $build_list);
+    $intersection_components = array_intersect($build_list, $component_list);
     // Get the requested components that we don't understand.
     $unknown_build_list = array_diff($build_list, $component_list);
 
@@ -374,12 +423,6 @@ class Module extends RootComponent {
       return $intersection_components;
     }
 
-    // Case 3: there are some requested components we don't know anything about.
-    // We assume that these are abbreviated filenames for the attention of
-    // ModuleBuider\Generator\Hooks; therefore we must ensure 'hooks' is in the
-    // list.
-    $intersection_components['hooks'] = 'hooks';
-
     // TODO: if the components create files containing classes, we probably
     // need to add the 'info' component, BUT we need to add to the .info file
     // rather than rewrite it! This requires (as does template.php) a system for
@@ -388,7 +431,24 @@ class Module extends RootComponent {
     return $intersection_components;
   }
 
-  // No need to declare collectFiles(): parent class will have something that
-  // does nothing apart from recurse.
+  /**
+   * Provides replacement strings for tokens in code body.
+   *
+   * @return
+   *  An array of tokens to replacements, suitable for use by strtr().
+   */
+  function getReplacements() {
+    // Get old style variable names.
+    $module_data = $this->getRootComponentData();
+
+    return array(
+      '%module'       => $module_data['root_name'],
+      '%Module'       => ucfirst($module_data['root_name']),
+      '%description'  => str_replace("'", "\'", $module_data['short_description']),
+      '%name'         => !empty($module_data['readable_name']) ? str_replace("'", "\'", $module_data['readable_name']) : $module_data['root_name'],
+      '%help'         => !empty($module_data['module_help_text']) ? str_replace('"', '\"', $module_data['module_help_text']) : 'TODO: Create admin help text.',
+      '%readable'     => str_replace("'", "\'", $module_data['readable_name']),
+    );
+  }
 
 }

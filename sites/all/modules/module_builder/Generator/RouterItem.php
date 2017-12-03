@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Generator\RouterItem.
+ * Contains ModuleBuilder\Generator\RouterItem.
  */
 
-namespace ModuleBuider\Generator;
+namespace ModuleBuilder\Generator;
 
 /**
  * Generator for a router item.
@@ -41,7 +41,7 @@ class RouterItem extends BaseGenerator {
    *      - 'title': The title for the item.
    *      - TODO: further properties such as access!
    */
-  function __construct($component_name, $component_data = array()) {
+  function __construct($component_name, $component_data, $generate_task, $root_generator) {
     // Set some default properties.
     // This allows the user to leave off specifying details like title and
     // access, and get default strings in place that they can replace in
@@ -50,13 +50,17 @@ class RouterItem extends BaseGenerator {
       // Use a default that can be selected with a single double-click, to make
       // it easy to replace.
       'title' => 'myPage',
+      'page callback' => 'example_page',
+      // These have to be a code string, not an actual array!
+      'page arguments' => "array()",
+      'access arguments' => "array('access content')",
     );
 
-    parent::__construct($component_name, $component_data);
+    parent::__construct($component_name, $component_data, $generate_task, $root_generator);
   }
 
   /**
-   * @inheritdoc
+   * {@inheritdoc}
    */
   public static function requestedComponentHandling() {
     return 'repeat';
@@ -69,35 +73,11 @@ class RouterItem extends BaseGenerator {
    *  An array of subcomponent names and types.
    */
   protected function requiredComponents() {
-    // Create the item data for the HookMenu component.
-    $menu_item = array(
-      'path' => $this->name,
-    );
-
-    // Copy properties from the RouterItem component data to the hook_menu()
-    // item.
-    $properties_to_copy = array(
-      'title',
-      'page callback',
-      'page arguments',
-      'access callback',
-      'access arguments',
-    );
-    foreach ($properties_to_copy as $property_name) {
-      if (isset($this->component_data[$property_name])) {
-        $menu_item[$property_name] = $this->component_data[$property_name];
-      }
-    }
-
     $return = array(
-      // Each RouterItem that gets added will cause a repeat request of these
-      // components.
-      'hook_menu' => array(
-        'component_type' => 'HookMenu',
-        // This is a numeric array of items, so repeated requests of this
-        // component will merge it.
-        'menu_items' => array(
-          $menu_item,
+      'hooks' => array(
+        'component_type' => 'Hooks',
+        'hooks' => array(
+          'hook_menu' => TRUE,
         ),
       ),
     );
@@ -105,48 +85,40 @@ class RouterItem extends BaseGenerator {
     return $return;
   }
 
-}
-
-/**
- * Generator for router item on Drupal 8.
- *
- * This adds a routing item to the routing component, and optionally an item
- * to hook_menu() (the optional bit is todo!).
- */
-class RouterItem8 extends RouterItem {
+  /**
+   * {@inheritdoc}
+   */
+  function containingComponent() {
+    return 'hook_menu';
+  }
 
   /**
-   * Declares the subcomponents for this component.
-   *
-   * @return
-   *  An array of subcomponent names and types.
+   * {@inheritdoc}
    */
-  protected function requiredComponents() {
-    return array(
-      // Each RouterItem that gets added will cause a repeat request of these
-      // components.
-      // TODO: make hook menu optional per router item.
-      'hook_menu' => array(
-        'component_type' => 'HookMenu',
-        'menu_items' => array(
-          array(
-            // TODO: further items.
-            'path' => $this->name,
-            'title' => $this->component_data['title'],
-          ),
-        ),
-      ),
-      'routing' => array(
-        'component_type' => 'Routing',
-        'routing_items' => array(
-          array(
-            // TODO: further items.
-            'path' => $this->name,
-            'title' => $this->component_data['title'],
-          ),
-        ),
-      ),
-    );
+  public function buildComponentContents($children_contents) {
+    // Return code for a single menu item. Our parent in the component tree,
+    // HookMenu, will merge it in its own buildComponentContents().
+    $code = array();
+    $code[] = "£items['{$this->name}'] = array(";
+    $code[] = "  'title' => '{$this->component_data['title']}',";
+    if (isset($this->component_data['description'])) {
+      $code[] = "  'description' => '{$this->component_data['description']}',";
+    }
+    $code[] = "  'page callback' => '{$this->component_data['page callback']}',";
+    // This is an array, so not quoted.
+    $code[] = "  'page arguments' => {$this->component_data['page arguments']},";
+    // This is an array, so not quoted.
+    $code[] = "  'access arguments' => {$this->component_data['access arguments']},";
+    if (isset($this->component_data['file'])) {
+      $code[] = "  'file' => '{$this->component_data['file']}',";
+    }
+    if (isset($this->component_data['type'])) {
+      // The type is a constant, so is not quoted.
+      $code[] = "  'type' => {$this->component_data['type']},";
+    }
+    $code[] = ");";
+
+    return $code;
   }
 
 }

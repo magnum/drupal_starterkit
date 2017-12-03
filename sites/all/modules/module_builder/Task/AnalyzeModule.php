@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of ModuleBuider\Task\AnalyzeModule.
+ * Contains ModuleBuilder\Task\AnalyzeModule.
  */
 
-namespace ModuleBuider\Task;
+namespace ModuleBuilder\Task;
 
 /**
  * Task handler for analyzing an existing module.
@@ -15,14 +15,12 @@ class AnalyzeModule extends Base {
   /**
    * The sanity level this task requires to operate.
    */
-  protected $sanity_level = 'hook_data';
+  protected $sanity_level = 'component_data_processed';
 
   /**
    * Helper function to get all the code files for a given module
    *
    * TODO: does drush have this?
-   *
-   * (Replaces module_builder_get_module_files().)
    *
    * @param $module_root_name
    *  The root name of a module, eg 'node', 'taxonomy'.
@@ -31,7 +29,7 @@ class AnalyzeModule extends Base {
    *  A flat array of filenames.
    */
   public function getFiles($module_root_name) {
-    $filepath = drupal_get_path('module', $module_root_name);
+    $filepath = $this->environment->getExtensionPath('module', $module_root_name);
 
     //$old_dir = getcwd();
     //chdir($filepath);
@@ -49,8 +47,6 @@ class AnalyzeModule extends Base {
 
   /**
    * Helper function to get all function names from a file.
-   *
-   * (Replaces module_builder_get_functions().)
    *
    * @param $file
    *  A complete filename from the Drupal root, eg 'modules/user/user.module'.
@@ -83,7 +79,7 @@ class AnalyzeModule extends Base {
    */
   public function getInventedHooks($module_root_name) {
     // Get the module's folder.
-    $module_folder = drupal_get_path('module', $module_root_name);
+    $module_folder = $this->environment->getExtensionPath('module', $module_root_name);
 
     // Bail if the folder doesn't exist yet: there is nothing to do.
     if (!file_exists($module_folder)) {
